@@ -1,0 +1,40 @@
+[package]
+name = "grok-media-cli"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "CLI for Grok Imagine image and video generation"
+readme = "README.md"
+keywords = ["grok", "xai", "image", "video", "cli"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "grok-media"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+clap = { version = "4", features = ["derive", "env"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "fs", "process"] }
+toml = "0.8"
+
+# Official Grok Build crates, pinned to a main commit.
+xai-dirs = { git = "https://github.com/xai-org/grok-build", rev = "bc7f02eddd3d84085849dc19ed216f11c23b0571", package = "xai-dirs" }
+xai-grok-auth = { git = "https://github.com/xai-org/grok-build", rev = "bc7f02eddd3d84085849dc19ed216f11c23b0571", package = "xai-grok-auth" }
+xai-grok-env = { git = "https://github.com/xai-org/grok-build", rev = "bc7f02eddd3d84085849dc19ed216f11c23b0571", package = "xai-grok-env" }
+xai-grok-paths = { git = "https://github.com/xai-org/grok-build", rev = "bc7f02eddd3d84085849dc19ed216f11c23b0571", package = "xai-grok-paths" }
+# xai-grok-tools pulls xai-grok-tools-api, whose build.rs needs the
+# grok-build monorepo's vendored protoc/dotslash. Pin the library crates
+# above instead and call the same Imagine HTTP API those tools use.
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
