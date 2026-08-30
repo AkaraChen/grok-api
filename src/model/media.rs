@@ -33,7 +33,14 @@ pub struct ImageGenerateRequest {
     pub resolution: Option<String>,
     pub quality: Option<String>,
     pub response_format: ResponseFormat,
-    pub image: Option<String>,
+    pub images: Vec<String>,
+}
+
+pub fn image_refs(image: Option<String>, images: Option<Vec<String>>) -> Vec<String> {
+    match images {
+        Some(images) if !images.is_empty() => images,
+        _ => image.into_iter().collect(),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]

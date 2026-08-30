@@ -171,9 +171,9 @@ pub enum ImageCommand {
         /// Quality: low, medium, auto. Imagine accepts auto; high is not supported
         #[arg(long, value_parser = ["low", "medium", "auto"])]
         quality: Option<String>,
-        /// Source image path or URL for image editing
+        /// Source image path or URL for image editing (repeatable). One image sends `image`; more send `images`
         #[arg(long)]
-        image: Option<String>,
+        image: Vec<String>,
     },
     /// Query Imagine image models
     Model {
@@ -474,6 +474,28 @@ mod tests {
         let text = err.to_string();
         assert!(text.contains("high"));
         assert!(text.contains("low") && text.contains("medium") && text.contains("auto"));
+    }
+
+    #[test]
+    fn parses_image_generate_multi_image() {
+        let cli = Cli::try_parse_from([
+            "grok-api",
+            "image",
+            "generate",
+            "--prompt",
+            "remix these",
+            "--image",
+            "a.png",
+            "--image",
+            "b.png",
+        ])
+        .unwrap();
+        match cli.resource {
+            Some(Resource::Image {
+                command: ImageCommand::Generate { image, .. },
+            }) => assert_eq!(image, ["a.png", "b.png"]),
+            other => panic!("unexpected {other:?}"),
+        }
     }
 
     #[test]

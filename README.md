@@ -39,6 +39,7 @@ Two credential sources:
 grok-api image generate --prompt "A cat in a spacesuit on Mars" --aspect-ratio 16:9
 grok-api image generate --prompt "Logo design" --n 3 --out-dir ./generated/
 grok-api image generate --prompt "A cat" --out /tmp/cat.jpg
+grok-api image generate --prompt "combine these" --image subject.png --image style.png
 grok-api video generate --prompt "Ocean waves at sunset." --download sunset.mp4
 grok-api video generate --prompt "A robot painting." --async --quiet
 grok-api video task get --task-id <request_id>
