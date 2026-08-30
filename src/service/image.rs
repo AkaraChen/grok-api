@@ -55,6 +55,17 @@ pub async fn generate(ctx: &AuthContext, opts: ImageGenerateOpts) -> Result<Imag
     Ok(result)
 }
 
+pub async fn list_models(ctx: &AuthContext) -> Result<Vec<serde_json::Value>> {
+    let credential = auth::load_credential(ctx)?;
+    let client = ImagineClient::new(
+        &ctx.config.base_url,
+        credential,
+        Duration::from_secs(ctx.config.timeout),
+    )?;
+    let value = client.list_models().await?;
+    Ok(crate::infra::imagine::filter_imagine_image_models(&value))
+}
+
 fn output_path(opts: &ImageGenerateOpts, index: usize) -> Result<Option<PathBuf>> {
     if let Some(out) = &opts.out {
         return Ok(Some(abs(out)?.to_path_buf()));

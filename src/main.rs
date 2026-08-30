@@ -9,8 +9,8 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use crate::cli::{
-    AuthCommand, Cli, ConfigCommand, Globals, ImageCommand, Resource, VideoCommand,
-    VideoTaskCommand, print_root_help, source_from_globals,
+    AuthCommand, Cli, ConfigCommand, Globals, ImageCommand, ImageModelCommand, Resource,
+    VideoCommand, VideoTaskCommand, VideoVoiceCommand, print_root_help, source_from_globals,
 };
 use crate::error::Result;
 use crate::infra::output::{emit, emit_text};
@@ -86,7 +86,11 @@ async fn auth_cmd(
         } => {
             let status = if let Some(api_key) = api_key.or(globals.api_key.clone()) {
                 if globals.dry_run {
-                    return emit_text(output, globals.quiet, "dry-run: would save API key to ~/.grok-api");
+                    return emit_text(
+                        output,
+                        globals.quiet,
+                        "dry-run: would save API key to ~/.grok-api",
+                    );
                 }
                 auth::login_with_api_key(&api_key)?
             } else if from_grok_cli || globals.from_grok_cli {
@@ -137,14 +141,27 @@ async fn auth_cmd(
         }
         AuthCommand::Refresh { device_auth } => {
             if globals.dry_run {
-                return emit_text(output, globals.quiet, "dry-run: would refresh ~/.grok-api via grok login");
+                return emit_text(
+                    output,
+                    globals.quiet,
+                    "dry-run: would refresh ~/.grok-api via grok login",
+                );
             }
             let status = auth::refresh(device_auth)?;
-            emit(output, globals.quiet, "refreshed ~/.grok-api login", &status)
+            emit(
+                output,
+                globals.quiet,
+                "refreshed ~/.grok-api login",
+                &status,
+            )
         }
         AuthCommand::Logout { yes } => {
             if globals.dry_run {
-                return emit_text(output, globals.quiet, "dry-run: would delete ~/.grok-api/auth.json");
+                return emit_text(
+                    output,
+                    globals.quiet,
+                    "dry-run: would delete ~/.grok-api/auth.json",
+                );
             }
             let deleted = auth::logout(yes || globals.non_interactive)?;
             emit(
@@ -167,56 +184,84 @@ async fn image_cmd(
     output: OutputFormat,
     command: ImageCommand,
 ) -> Result<()> {
-    let ImageCommand::Generate {
-        prompt,
-        aspect_ratio,
-        n,
-        out,
-        response_format,
-        out_dir,
-        out_prefix,
-        model,
-        resolution,
-        quality,
-        image,
-    } = command;
-    let response_format = ResponseFormat::parse(&response_format).ok_or_else(|| {
-        crate::error::Error::InvalidValue {
-            flag: "response-format",
-            value: response_format,
-        }
-    })?;
-    let result = image::generate(
-        ctx,
-        image::ImageGenerateOpts {
-            request: ImageGenerateRequest {
-                prompt,
-                model: model.unwrap_or_else(|| ctx.config.default_image_model.clone()),
-                aspect_ratio,
-                n,
-                resolution,
-                quality,
-                response_format,
-                image,
-            },
+    match command {
+        ImageCommand::Generate {
+            prompt,
+            aspect_ratio,
+            n,
             out,
+            response_format,
             out_dir,
             out_prefix,
-            dry_run: globals.dry_run,
-        },
-    )
-    .await?;
-    let text = if globals.dry_run {
-        "dry-run: would call POST /images/generations".to_string()
-    } else {
-        result
-            .images
-            .iter()
-            .filter_map(|image| image.path.clone().or(image.url.clone()))
-            .collect::<Vec<_>>()
-            .join("\n")
-    };
-    emit(output, globals.quiet, text, &result)
+            model,
+            resolution,
+            quality,
+            image,
+        } => {
+            let response_format = ResponseFormat::parse(&response_format).ok_or_else(|| {
+                crate::error::Error::InvalidValue {
+                    flag: "response-format",
+                    value: response_format,
+                }
+            })?;
+            let result = image::generate(
+                ctx,
+                image::ImageGenerateOpts {
+                    request: ImageGenerateRequest {
+                        prompt,
+                        model: model.unwrap_or_else(|| ctx.config.default_image_model.clone()),
+                        aspect_ratio,
+                        n,
+                        resolution,
+                        quality,
+                        response_format,
+                        image,
+                    },
+                    out,
+                    out_dir,
+                    out_prefix,
+                    dry_run: globals.dry_run,
+                },
+            )
+            .await?;
+            let text = if globals.dry_run {
+                "dry-run: would call POST /images/generations".to_string()
+            } else {
+                result
+                    .images
+                    .iter()
+                    .filter_map(|image| image.path.clone().or(image.url.clone()))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            emit(output, globals.quiet, text, &result)
+        }
+        ImageCommand::Model {
+            command: ImageModelCommand::List,
+        } => {
+            if globals.dry_run {
+                return emit_text(output, globals.quiet, "dry-run: would call GET /models");
+            }
+            let models = image::list_models(ctx).await?;
+            let text = models
+                .iter()
+                .map(format_model_line)
+                .collect::<Vec<_>>()
+                .join("\n");
+            emit(output, globals.quiet, text, &models)
+        }
+    }
+}
+
+fn format_model_line(model: &serde_json::Value) -> String {
+    let id = model
+        .get("id")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("?");
+    match model.get("owned_by").and_then(serde_json::Value::as_str) {
+        Some(owner) => format!("{id} {owner}"),
+        None => id.to_string(),
+    }
 }
 
 async fn video_cmd(
@@ -233,6 +278,8 @@ async fn video_cmd(
             reference_image,
             duration,
             aspect_ratio,
+            resolution,
+            voice,
             download,
             no_wait,
             r#async,
@@ -245,8 +292,10 @@ async fn video_cmd(
                     model: model.unwrap_or_else(|| ctx.config.default_video_model.clone()),
                     image,
                     reference_images: reference_image,
+                    voices: voice,
                     duration,
                     aspect_ratio,
+                    resolution,
                     wait: !(no_wait || r#async),
                     poll_interval_secs: poll_interval.unwrap_or(DEFAULT_POLL_INTERVAL_SECS),
                 },
@@ -276,6 +325,20 @@ async fn video_cmd(
                 &task,
             )
         }
+        VideoCommand::Voice {
+            command: VideoVoiceCommand::List,
+        } => {
+            if globals.dry_run {
+                return emit_text(output, globals.quiet, "dry-run: would call GET /tts/voices");
+            }
+            let voices = video::list_voices(ctx).await?;
+            let text = crate::infra::imagine::voice_entries(&voices)
+                .iter()
+                .map(format_voice_line)
+                .collect::<Vec<_>>()
+                .join("\n");
+            emit(output, globals.quiet, text, &voices)
+        }
         VideoCommand::Download { file_id, out } => {
             let result = video::download(ctx, &file_id, &out).await?;
             emit(
@@ -285,6 +348,24 @@ async fn video_cmd(
                 &result,
             )
         }
+    }
+}
+
+fn format_voice_line(voice: &serde_json::Value) -> String {
+    let id = voice
+        .get("voice_id")
+        .or_else(|| voice.get("id"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("?");
+    let name = voice.get("name").and_then(serde_json::Value::as_str);
+    let language = voice
+        .get("language")
+        .or_else(|| voice.get("lang"))
+        .and_then(serde_json::Value::as_str);
+    match (name, language) {
+        (Some(name), Some(language)) => format!("{id} {name} {language}"),
+        (Some(name), None) => format!("{id} {name}"),
+        _ => id.to_string(),
     }
 }
 

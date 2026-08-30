@@ -68,34 +68,16 @@ impl ImagineClient {
         Ok(headers)
     }
 
-    pub async fn generate_image(&self, request: &ImageGenerateRequest) -> Result<ImageGenerateResult> {
+    pub async fn generate_image(
+        &self,
+        request: &ImageGenerateRequest,
+    ) -> Result<ImageGenerateResult> {
         let endpoint = if request.image.is_some() {
             format!("{}/images/edits", self.base_url)
         } else {
             format!("{}/images/generations", self.base_url)
         };
-        let mut body = json!({
-            "model": request.model,
-            "prompt": request.prompt,
-            "n": request.n,
-            "response_format": request.response_format.as_api_value(),
-        });
-        if let Some(ratio) = &request.aspect_ratio {
-            body["aspect_ratio"] = json!(ratio);
-        }
-        if let Some(resolution) = &request.resolution {
-            body["resolution"] = json!(resolution);
-        }
-        if let Some(quality) = &request.quality {
-            body["quality"] = json!(quality);
-        }
-        if let Some(image) = &request.image {
-            body["image"] = json!({
-                "url": image_ref(image)?,
-                "type": "image_url",
-            });
-        }
-
+        let body = image_generate_body(request)?;
         let value = self.post_json(&endpoint, body).await?;
         let model = value
             .get("model")
@@ -108,29 +90,19 @@ impl ImagineClient {
 
     pub async fn start_video(&self, request: &VideoGenerateRequest) -> Result<VideoTask> {
         let endpoint = format!("{}/videos/generations", self.base_url);
-        let mut body = json!({
-            "model": request.model,
-            "prompt": request.prompt,
-        });
-        if let Some(duration) = request.duration {
-            body["duration"] = json!(duration);
-        }
-        if let Some(ratio) = &request.aspect_ratio {
-            body["aspect_ratio"] = json!(ratio);
-        }
-        if let Some(image) = &request.image {
-            body["image"] = json!({ "url": image_ref(image)? });
-        }
-        if !request.reference_images.is_empty() {
-            let images: Result<Vec<Value>> = request
-                .reference_images
-                .iter()
-                .map(|image| Ok(json!({ "url": image_ref(image)? })))
-                .collect();
-            body["reference_images"] = json!(images?);
-        }
+        let body = video_generate_body(request)?;
         let value = self.post_json(&endpoint, body).await?;
         parse_video_task(value)
+    }
+
+    pub async fn list_models(&self) -> Result<Value> {
+        let endpoint = format!("{}/models", self.base_url);
+        self.get_json(&endpoint).await
+    }
+
+    pub async fn list_voices(&self) -> Result<Value> {
+        let endpoint = format!("{}/tts/voices", self.base_url);
+        self.get_json(&endpoint).await
     }
 
     pub async fn get_video(&self, request_id: &str) -> Result<VideoTask> {
@@ -251,6 +223,92 @@ fn parse_video_task(value: Value) -> Result<VideoTask> {
     })
 }
 
+pub fn image_generate_body(request: &ImageGenerateRequest) -> Result<Value> {
+    let mut body = json!({
+        "model": request.model,
+        "prompt": request.prompt,
+        "n": request.n,
+        "response_format": request.response_format.as_api_value(),
+        "aspect_ratio": request.aspect_ratio.as_deref().unwrap_or("auto"),
+        "resolution": request.resolution.as_deref().unwrap_or("1k"),
+    });
+    if let Some(quality) = &request.quality {
+        body["quality"] = json!(quality);
+    }
+    if let Some(image) = &request.image {
+        body["image"] = json!({
+            "url": image_ref(image)?,
+            "type": "image_url",
+        });
+    }
+    Ok(body)
+}
+
+pub fn video_generate_body(request: &VideoGenerateRequest) -> Result<Value> {
+    let mut body = json!({
+        "model": request.model,
+        "prompt": request.prompt,
+    });
+    if let Some(duration) = request.duration {
+        body["duration"] = json!(duration);
+    }
+    if let Some(ratio) = &request.aspect_ratio {
+        body["aspect_ratio"] = json!(ratio);
+    }
+    if let Some(resolution) = &request.resolution {
+        body["resolution"] = json!(resolution);
+    }
+    if let Some(image) = &request.image {
+        body["image"] = json!({ "url": image_ref(image)? });
+    }
+    if !request.reference_images.is_empty() {
+        let images: Result<Vec<Value>> = request
+            .reference_images
+            .iter()
+            .map(|image| Ok(json!({ "url": image_ref(image)? })))
+            .collect();
+        body["reference_images"] = json!(images?);
+    }
+    if !request.voices.is_empty() {
+        body["reference_audios"] = json!(
+            request
+                .voices
+                .iter()
+                .map(|voice_id| json!({ "voice_id": voice_id }))
+                .collect::<Vec<_>>()
+        );
+    }
+    Ok(body)
+}
+
+pub fn filter_imagine_image_models(value: &Value) -> Vec<Value> {
+    let data = value
+        .get("data")
+        .and_then(Value::as_array)
+        .or_else(|| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    data.into_iter()
+        .filter(|model| {
+            let id = model.get("id").and_then(Value::as_str).unwrap_or("");
+            if id.starts_with("grok-imagine-video") {
+                return false;
+            }
+            id.starts_with("grok-imagine-image") || model.get("image_price").is_some()
+        })
+        .collect()
+}
+
+pub fn voice_entries(value: &Value) -> Vec<Value> {
+    value
+        .get("voices")
+        .or_else(|| value.get("data"))
+        .and_then(Value::as_array)
+        .or_else(|| value.as_array())
+        .cloned()
+        .unwrap_or_default()
+}
+
 pub fn image_ref(input: &str) -> Result<String> {
     if input.starts_with("http://") || input.starts_with("https://") || input.starts_with("data:") {
         return Ok(input.to_string());
@@ -291,5 +349,122 @@ pub fn video_result(task: VideoTask, path: Option<String>) -> VideoGenerateResul
         status: task.status,
         url: task.video.and_then(|video| video.url),
         path,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::media::{ImageGenerateRequest, ResponseFormat, VideoGenerateRequest};
+
+    fn image_request() -> ImageGenerateRequest {
+        ImageGenerateRequest {
+            prompt: "a cat".into(),
+            model: "grok-imagine-image-2.0".into(),
+            aspect_ratio: None,
+            n: 1,
+            resolution: None,
+            quality: None,
+            response_format: ResponseFormat::Url,
+            image: None,
+        }
+    }
+
+    fn video_request() -> VideoGenerateRequest {
+        VideoGenerateRequest {
+            prompt: "ocean waves".into(),
+            model: "grok-imagine-video-1.5".into(),
+            image: None,
+            reference_images: Vec::new(),
+            voices: Vec::new(),
+            duration: None,
+            aspect_ratio: None,
+            resolution: None,
+            wait: false,
+            poll_interval_secs: 5,
+        }
+    }
+
+    #[test]
+    fn image_body_sends_defaults_and_wire_response_format() {
+        let body = image_generate_body(&image_request()).unwrap();
+        assert_eq!(body["aspect_ratio"], "auto");
+        assert_eq!(body["resolution"], "1k");
+        assert_eq!(body["response_format"], "url");
+        assert!(body.get("quality").is_none());
+    }
+
+    #[test]
+    fn image_body_maps_base64_to_b64_json() {
+        let mut request = image_request();
+        request.response_format = ResponseFormat::Base64;
+        request.aspect_ratio = Some("16:9".into());
+        request.resolution = Some("2k".into());
+        request.quality = Some("auto".into());
+        let body = image_generate_body(&request).unwrap();
+        assert_eq!(body["response_format"], "b64_json");
+        assert_eq!(body["aspect_ratio"], "16:9");
+        assert_eq!(body["resolution"], "2k");
+        assert_eq!(body["quality"], "auto");
+    }
+
+    #[test]
+    fn video_body_omits_resolution_by_default() {
+        let body = video_generate_body(&video_request()).unwrap();
+        assert!(body.get("resolution").is_none());
+        assert!(body.get("reference_audios").is_none());
+    }
+
+    #[test]
+    fn video_body_sends_resolution_on_text_and_image_to_video() {
+        let mut t2v = video_request();
+        t2v.resolution = Some("720p".into());
+        let t2v_body = video_generate_body(&t2v).unwrap();
+        assert_eq!(t2v_body["resolution"], "720p");
+        assert!(t2v_body.get("image").is_none());
+
+        let mut i2v = video_request();
+        i2v.image = Some("https://example.com/start.png".into());
+        i2v.resolution = Some("1080p".into());
+        let i2v_body = video_generate_body(&i2v).unwrap();
+        assert_eq!(i2v_body["resolution"], "1080p");
+        assert_eq!(i2v_body["image"]["url"], "https://example.com/start.png");
+    }
+
+    #[test]
+    fn video_body_sends_reference_audios() {
+        let mut request = video_request();
+        request.voices = vec!["eve".into(), "leo".into()];
+        let body = video_generate_body(&request).unwrap();
+        assert_eq!(
+            body["reference_audios"],
+            json!([{ "voice_id": "eve" }, { "voice_id": "leo" }])
+        );
+    }
+
+    #[test]
+    fn filters_imagine_image_models() {
+        let payload = json!({
+            "data": [
+                { "id": "grok-imagine-image-2.0", "owned_by": "xai" },
+                { "id": "grok-imagine-image-quality" },
+                { "id": "grok-imagine-video-1.5", "image_price": 1 },
+                { "id": "grok-3", "image_price": 2 },
+                { "id": "grok-3" }
+            ]
+        });
+        let models = filter_imagine_image_models(&payload);
+        let ids: Vec<_> = models
+            .iter()
+            .map(|model| model["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            ids,
+            [
+                "grok-imagine-image-2.0",
+                "grok-imagine-image-quality",
+                "grok-3"
+            ]
+        );
     }
 }
