@@ -4,6 +4,8 @@ This crate is a **thin CLI glue layer** over official Grok CLI / [xai-org/grok-b
 
 If a change needs new request shapes, retries, validation, defaults, or error mapping that grok-build does not already do: **do not write it here**. Pin or call the official crate, or spawn official `grok` with `GROK_HOME` pointed at `~/.grok-api`.
 
+Public install and usage live in [README.md](README.md). Keep contributor rules here.
+
 ## Allowed
 
 - clap surface (`<resource> <command> [flags]`) that forwards flags to official fields
@@ -26,9 +28,26 @@ If a change needs new request shapes, retries, validation, defaults, or error ma
 
 Auth on session tokens: `Authorization: Bearer` plus `X-XAI-Token-Auth: xai-grok-cli` — same as grok-build.
 
+## Dependencies
+
+Pin official [xai-org/grok-build](https://github.com/xai-org/grok-build) crates (`xai-dirs`, `xai-grok-auth`, `xai-grok-env`, `xai-grok-paths`) at the rev in `Cargo.toml`. Call the same HTTP APIs those tools use.
+
+`xai-grok-tools` is not a compile-time dependency: its `tools-api` build.rs requires the monorepo's vendored `protoc` / `dotslash`. Do not add it.
+
 ## Commands
 
 ```bash
 cargo test
 cargo run -- image generate --help
+```
+
+Login for local runs is official `grok login` with `GROK_HOME` pointed at `~/.grok-api` instead of `~/.grok`.
+
+## Releasing
+
+Push a version tag. GitHub Actions builds every platform and uploads the archives:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
 ```
