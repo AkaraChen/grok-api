@@ -36,15 +36,9 @@ pub struct Globals {
     /// Suppress non-essential output
     #[arg(long, global = true)]
     pub quiet: bool,
-    /// Print HTTP request/response details
-    #[arg(long, global = true)]
-    pub verbose: bool,
     /// Request timeout (default: 300)
     #[arg(long, global = true)]
     pub timeout: Option<u64>,
-    /// Disable ANSI colors and spinners
-    #[arg(long, global = true)]
-    pub no_color: bool,
     /// Show what would happen without executing
     #[arg(long, global = true)]
     pub dry_run: bool,
@@ -268,9 +262,7 @@ Global Flags:
   --base-url <url>       API base URL (overrides config)
   --output <format>      Output format: text, json
   --quiet                Suppress non-essential output
-  --verbose              Print HTTP request/response details
   --timeout <seconds>    Request timeout (default: 300)
-  --no-color             Disable ANSI colors and spinners
   --dry-run              Show what would happen without executing
   --non-interactive      Disable interactive prompts (CI/agent mode)
   --version              Print version and exit
