@@ -495,7 +495,8 @@ def main() -> int:
         else:
             failures.check("gen_scoop.py", False, gen.stderr)
 
-        # Real GitHub API: this repo currently has no releases.
+        # Real GitHub API: latest release should install, unless unauthenticated
+        # requests hit a rate limit.
         real_dir = tmp / "real"
         real_dir.mkdir()
         real_env = os.environ.copy()
@@ -508,11 +509,11 @@ def main() -> int:
         )
         real = run(["bash", str(INSTALL_SH)], real_env)
         text = real.stdout + real.stderr
+        installed = real.returncode == 0 and "Installed grok-api" in text
+        rate_limited = "rate limit" in text.lower() and "releases/latest" in text
         failures.check(
-            "install.sh real GitHub API (no release yet)",
-            real.returncode != 0
-            and ("no GitHub release" in text or "rate limit" in text.lower())
-            and "releases/latest" in text,
+            "install.sh real GitHub API",
+            installed or rate_limited,
             text,
         )
 
