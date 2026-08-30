@@ -7,11 +7,11 @@ use crate::model::config::OutputFormat;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "grok-media",
-    bin_name = "grok-media",
+    name = "grok-api",
+    bin_name = "grok-api",
     version,
-    about = "Grok Imagine image and video generation CLI",
-    override_usage = "grok-media <resource> <command> [flags]",
+    about = "CLI for the Grok / xAI API",
+    override_usage = "grok-api <resource> <command> [flags]",
     disable_help_subcommand = true,
     next_line_help = false
 )]
@@ -102,7 +102,7 @@ pub enum AuthCommand {
         /// Skip the menu and save this API key directly
         #[arg(long)]
         api_key: Option<String>,
-        /// Use Grok OAuth via auth.x.ai (writes ~/.grok-media)
+        /// Use Grok OAuth via auth.x.ai (writes ~/.grok-api)
         #[arg(long)]
         oauth: bool,
         /// Use device-code authentication for headless/remote environments
@@ -114,12 +114,12 @@ pub enum AuthCommand {
     },
     /// Show current authentication state
     Status,
-    /// Re-run official Grok login into ~/.grok-media
+    /// Re-run official Grok login into ~/.grok-api
     Refresh {
         #[arg(long, alias = "device-code")]
         device_auth: bool,
     },
-    /// Clear stored credentials in ~/.grok-media
+    /// Clear stored credentials in ~/.grok-api
     Logout {
         /// Skip confirmation prompt
         #[arg(long)]
@@ -252,9 +252,9 @@ pub fn print_root_help() {
 ██║   ██║██╔══██╗██║   ██║██╔═██╗
 ╚██████╔╝██║  ██║╚██████╔╝██║  ██╗
  ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝
-              M E D I A
+               A P I
 
-Usage: grok-media <resource> <command> [flags]
+Usage: grok-api <resource> <command> [flags]
 
 Resources:
   auth       Authentication (login, status, refresh, logout)
@@ -278,7 +278,7 @@ Global Flags:
 
 Getting Help:
   Add --help after any command to see its full list of options, defaults,
-  and usage examples. For example: grok-media image generate --help
+  and usage examples. For example: grok-api image generate --help
 "#
     );
 }
@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn parses_image_generate() {
         let cli = Cli::try_parse_from([
-            "grok-media",
+            "grok-api",
             "image",
             "generate",
             "--prompt",
@@ -319,7 +319,7 @@ mod tests {
     #[test]
     fn parses_video_task_get() {
         let cli = Cli::try_parse_from([
-            "grok-media",
+            "grok-api",
             "video",
             "task",
             "get",

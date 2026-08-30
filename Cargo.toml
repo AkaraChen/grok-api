@@ -1,15 +1,16 @@
 [package]
-name = "grok-media-cli"
+name = "grok-api"
 version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0"
-description = "CLI for Grok Imagine image and video generation"
+description = "CLI for the Grok / xAI API"
+repository = "https://github.com/AkaraChen/grok-api"
 readme = "README.md"
 keywords = ["grok", "xai", "image", "video", "cli"]
 categories = ["command-line-utilities"]
 
 [[bin]]
-name = "grok-media"
+name = "grok-api"
 path = "src/main.rs"
 
 [dependencies]

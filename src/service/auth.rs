@@ -5,7 +5,7 @@ use crate::infra::grok_store::{
     api_key_store, delete_store, first_credential, load_store, write_store,
 };
 use crate::infra::paths::{
-    ensure_media_home, grok_cli_auth_path, grok_cli_home, media_auth_path, media_home,
+    api_auth_path, api_home, ensure_api_home, grok_cli_auth_path, grok_cli_home,
 };
 use crate::model::auth::{AuthSource, AuthStatus, Credential};
 use crate::model::config::AppConfig;
@@ -23,14 +23,14 @@ pub fn resolve_source(ctx: &AuthContext) -> AuthSource {
 
 pub fn home_for(source: AuthSource) -> std::path::PathBuf {
     match source {
-        AuthSource::GrokMedia => media_home(),
+        AuthSource::GrokApi => api_home(),
         AuthSource::GrokCli => grok_cli_home(),
     }
 }
 
 pub fn auth_path_for(source: AuthSource) -> std::path::PathBuf {
     match source {
-        AuthSource::GrokMedia => media_auth_path(),
+        AuthSource::GrokApi => api_auth_path(),
         AuthSource::GrokCli => grok_cli_auth_path(),
     }
 }
@@ -44,7 +44,7 @@ pub fn load_credential(ctx: &AuthContext) -> Result<Credential> {
         .or(env_key.as_ref())
     {
         return Ok(Credential {
-            source: AuthSource::GrokMedia,
+            source: AuthSource::GrokApi,
             mode: crate::model::auth::AuthMode::ApiKey,
             token: api_key.clone(),
             email: None,
@@ -57,13 +57,13 @@ pub fn load_credential(ctx: &AuthContext) -> Result<Credential> {
     if let Some(credential) = credential_from(source)? {
         return Ok(credential);
     }
-    if source == AuthSource::GrokMedia {
+    if source == AuthSource::GrokApi {
         if let Some(credential) = credential_from(AuthSource::GrokCli)? {
             return Ok(credential);
         }
     }
     Err(Error::auth(
-        "no credential found. Run `grok-media auth login --from-grok-cli` or `grok-media auth login --oauth`",
+        "no credential found. Run `grok-api auth login --from-grok-cli` or `grok-api auth login --oauth`",
     ))
 }
 
@@ -106,21 +106,21 @@ pub fn login_from_grok_cli() -> Result<AuthStatus> {
 }
 
 pub fn login_with_api_key(api_key: &str) -> Result<AuthStatus> {
-    ensure_media_home()?;
-    write_store(&media_auth_path(), &api_key_store(api_key))?;
+    ensure_api_home()?;
+    write_store(&api_auth_path(), &api_key_store(api_key))?;
     let mut config = config_service::load()?;
-    config.auth_source = AuthSource::GrokMedia;
+    config.auth_source = AuthSource::GrokApi;
     config_service::save(&config)?;
-    let store = load_store(&media_auth_path())?.expect("just written");
-    let credential = first_credential(&store, AuthSource::GrokMedia).expect("api key record");
+    let store = load_store(&api_auth_path())?.expect("just written");
+    let credential = first_credential(&store, AuthSource::GrokApi).expect("api key record");
     Ok(AuthStatus::from_credential(
         &credential,
-        media_home().display().to_string(),
+        api_home().display().to_string(),
     ))
 }
 
 pub fn login_with_official_grok(device_auth: bool) -> Result<AuthStatus> {
-    let home = ensure_media_home()?;
+    let home = ensure_api_home()?;
     let mut command = std::process::Command::new("grok");
     command.arg("login");
     if device_auth {
@@ -141,15 +141,15 @@ pub fn login_with_official_grok(device_auth: bool) -> Result<AuthStatus> {
         )));
     }
     let mut config = config_service::load()?;
-    config.auth_source = AuthSource::GrokMedia;
+    config.auth_source = AuthSource::GrokApi;
     config_service::save(&config)?;
-    let store = load_store(&media_auth_path())?.ok_or_else(|| {
+    let store = load_store(&api_auth_path())?.ok_or_else(|| {
         Error::auth(format!(
             "official login finished but {} is missing",
-            media_auth_path().display()
+            api_auth_path().display()
         ))
     })?;
-    let credential = first_credential(&store, AuthSource::GrokMedia)
+    let credential = first_credential(&store, AuthSource::GrokApi)
         .ok_or_else(|| Error::auth("official login wrote an empty auth store"))?;
     Ok(AuthStatus::from_credential(
         &credential,
@@ -164,8 +164,8 @@ pub fn refresh(device_auth: bool) -> Result<AuthStatus> {
 pub fn logout(yes: bool) -> Result<bool> {
     if !yes {
         return Err(Error::message(
-            "refusing to logout without --yes (this only clears ~/.grok-media, never ~/.grok)",
+            "refusing to logout without --yes (this only clears ~/.grok-api, never ~/.grok)",
         ));
     }
-    delete_store(&media_auth_path())
+    delete_store(&api_auth_path())
 }

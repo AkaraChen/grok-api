@@ -86,7 +86,7 @@ async fn auth_cmd(
         } => {
             let status = if let Some(api_key) = api_key.or(globals.api_key.clone()) {
                 if globals.dry_run {
-                    return emit_text(output, globals.quiet, "dry-run: would save API key to ~/.grok-media");
+                    return emit_text(output, globals.quiet, "dry-run: would save API key to ~/.grok-api");
                 }
                 auth::login_with_api_key(&api_key)?
             } else if from_grok_cli || globals.from_grok_cli {
@@ -103,7 +103,7 @@ async fn auth_cmd(
                     return emit_text(
                         output,
                         globals.quiet,
-                        "dry-run: would run `GROK_HOME=~/.grok-media grok login`",
+                        "dry-run: would run `GROK_HOME=~/.grok-api grok login`",
                     );
                 }
                 auth::login_with_official_grok(device_auth)?
@@ -137,23 +137,23 @@ async fn auth_cmd(
         }
         AuthCommand::Refresh { device_auth } => {
             if globals.dry_run {
-                return emit_text(output, globals.quiet, "dry-run: would refresh ~/.grok-media via grok login");
+                return emit_text(output, globals.quiet, "dry-run: would refresh ~/.grok-api via grok login");
             }
             let status = auth::refresh(device_auth)?;
-            emit(output, globals.quiet, "refreshed ~/.grok-media login", &status)
+            emit(output, globals.quiet, "refreshed ~/.grok-api login", &status)
         }
         AuthCommand::Logout { yes } => {
             if globals.dry_run {
-                return emit_text(output, globals.quiet, "dry-run: would delete ~/.grok-media/auth.json");
+                return emit_text(output, globals.quiet, "dry-run: would delete ~/.grok-api/auth.json");
             }
             let deleted = auth::logout(yes || globals.non_interactive)?;
             emit(
                 output,
                 globals.quiet,
                 if deleted {
-                    "cleared ~/.grok-media/auth.json"
+                    "cleared ~/.grok-api/auth.json"
                 } else {
-                    "no ~/.grok-media/auth.json to clear"
+                    "no ~/.grok-api/auth.json to clear"
                 },
                 &serde_json::json!({ "cleared": deleted }),
             )

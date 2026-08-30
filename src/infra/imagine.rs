@@ -22,7 +22,7 @@ pub const IMAGE_TO_VIDEO_TOOL_NAME: &str = "image_to_video";
 pub const IMAGINE_VIDEO_COMMAND_NAME: &str = "imagine-video";
 
 pub fn official_user_agent() -> String {
-    format!("grok-media/{}", env!("CARGO_PKG_VERSION"))
+    format!("grok-api/{}", env!("CARGO_PKG_VERSION"))
 }
 
 struct BearerAuth {

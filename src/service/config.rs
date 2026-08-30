@@ -1,11 +1,11 @@
 use std::fs;
 
 use crate::error::{Error, Result};
-use crate::infra::paths::{ensure_media_home, media_config_path};
+use crate::infra::paths::{api_config_path, ensure_api_home};
 use crate::model::config::AppConfig;
 
 pub fn load() -> Result<AppConfig> {
-    let path = media_config_path();
+    let path = api_config_path();
     if !path.exists() {
         return Ok(AppConfig::default());
     }
@@ -14,8 +14,8 @@ pub fn load() -> Result<AppConfig> {
 }
 
 pub fn save(config: &AppConfig) -> Result<()> {
-    ensure_media_home()?;
-    let path = media_config_path();
+    ensure_api_home()?;
+    let path = api_config_path();
     let raw =
         toml::to_string_pretty(config).map_err(|err| Error::Config(err.to_string()))?;
     fs::write(&path, raw).map_err(|source| Error::io(&path, source))?;

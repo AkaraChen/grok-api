@@ -342,7 +342,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "grok-media-cli"
+name = "grok-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",

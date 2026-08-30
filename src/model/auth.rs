@@ -4,21 +4,21 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "kebab-case")]
 pub enum AuthSource {
     #[default]
-    GrokMedia,
+    GrokApi,
     GrokCli,
 }
 
 impl AuthSource {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::GrokMedia => "grok-media",
+            Self::GrokApi => "grok-api",
             Self::GrokCli => "grok-cli",
         }
     }
 
     pub fn parse(value: &str) -> Option<Self> {
         match value {
-            "grok-media" | "media" => Some(Self::GrokMedia),
+            "grok-api" | "api" => Some(Self::GrokApi),
             "grok-cli" | "grok" => Some(Self::GrokCli),
             _ => None,
         }

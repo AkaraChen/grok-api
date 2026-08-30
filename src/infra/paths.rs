@@ -4,7 +4,7 @@ use xai_grok_paths::AbsPathBuf;
 
 use crate::error::{Error, Result};
 
-const MEDIA_DIR_NAME: &str = ".grok-media";
+const API_DIR_NAME: &str = ".grok-api";
 
 /// Official Grok CLI home: `~/.grok`, ignoring `$GROK_HOME`.
 pub fn grok_cli_home() -> PathBuf {
@@ -12,26 +12,26 @@ pub fn grok_cli_home() -> PathBuf {
 }
 
 /// This CLI's home. Official login uses `$GROK_HOME`; we point that at this path.
-pub fn media_home() -> PathBuf {
+pub fn api_home() -> PathBuf {
     xai_dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(MEDIA_DIR_NAME)
+        .join(API_DIR_NAME)
 }
 
-pub fn media_auth_path() -> PathBuf {
-    media_home().join("auth.json")
+pub fn api_auth_path() -> PathBuf {
+    api_home().join("auth.json")
 }
 
 pub fn grok_cli_auth_path() -> PathBuf {
     grok_cli_home().join("auth.json")
 }
 
-pub fn media_config_path() -> PathBuf {
-    media_home().join("config.toml")
+pub fn api_config_path() -> PathBuf {
+    api_home().join("config.toml")
 }
 
-pub fn ensure_media_home() -> Result<PathBuf> {
-    let home = media_home();
+pub fn ensure_api_home() -> Result<PathBuf> {
+    let home = api_home();
     std::fs::create_dir_all(&home).map_err(|source| Error::io(&home, source))?;
     Ok(home)
 }
@@ -58,13 +58,13 @@ mod tests {
     }
 
     #[test]
-    fn media_home_ends_with_grok_media() {
-        assert!(media_home().ends_with(".grok-media"));
+    fn api_home_ends_with_grok_api() {
+        assert!(api_home().ends_with(".grok-api"));
     }
 
     #[test]
     fn homes_are_siblings() {
-        assert_ne!(grok_cli_home(), media_home());
-        assert_eq!(grok_cli_home().parent(), media_home().parent());
+        assert_ne!(grok_cli_home(), api_home());
+        assert_eq!(grok_cli_home().parent(), api_home().parent());
     }
 }

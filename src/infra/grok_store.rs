@@ -129,7 +129,7 @@ mod tests {
         let path = dir.path().join("auth.json");
         write_store(&path, &api_key_store("xai-secret")).unwrap();
         let loaded = load_store(&path).unwrap().unwrap();
-        let credential = first_credential(&loaded, AuthSource::GrokMedia).unwrap();
+        let credential = first_credential(&loaded, AuthSource::GrokApi).unwrap();
         assert_eq!(credential.token, "xai-secret");
         assert_eq!(credential.mode, AuthMode::ApiKey);
     }
