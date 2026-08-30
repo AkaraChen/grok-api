@@ -141,7 +141,11 @@ impl ImagineClient {
     pub async fn get_video(&self, request_id: &str) -> Result<VideoTask> {
         let endpoint = format!("{}/videos/{request_id}", self.base_url);
         let value = self.get_json(&endpoint).await?;
-        parse_video_task(value)
+        let mut task = parse_video_task(value)?;
+        if task.request_id.is_empty() {
+            task.request_id = request_id.to_string();
+        }
+        Ok(task)
     }
 
     pub async fn wait_video(&self, request_id: &str, poll_interval: Duration) -> Result<VideoTask> {
@@ -178,7 +182,12 @@ impl ImagineClient {
 
     async fn post_json(&self, url: &str, body: Value) -> Result<Value> {
         let request = self.http.post(url).headers(self.headers()?).json(&body);
-        let response = self.auth.apply(request, &self.base_url).send().await?;
+        let response = self
+            .auth
+            .apply(request, &self.base_url)
+            .send()
+            .await
+            .map_err(|err| Error::message(format!("HTTP POST {url} failed: {err}")))?;
         self.read_json(response).await
     }
 
@@ -239,7 +248,7 @@ fn parse_video_task(value: Value) -> Result<VideoTask> {
         .get("request_id")
         .or_else(|| value.get("id"))
         .and_then(Value::as_str)
-        .ok_or_else(|| Error::message("video response missing request_id"))?
+        .unwrap_or_default()
         .to_string();
     Ok(VideoTask {
         request_id,

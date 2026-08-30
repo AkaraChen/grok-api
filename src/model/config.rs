@@ -26,7 +26,7 @@ impl OutputFormat {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
     pub auth_source: AuthSource,
@@ -58,6 +58,20 @@ fn default_image_model() -> String {
 
 fn default_video_model() -> String {
     DEFAULT_VIDEO_MODEL.to_string()
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            auth_source: AuthSource::default(),
+            base_url: default_base_url(),
+            output: OutputFormat::default(),
+            timeout: default_timeout(),
+            api_key: None,
+            default_image_model: default_image_model(),
+            default_video_model: default_video_model(),
+        }
+    }
 }
 
 impl AppConfig {
