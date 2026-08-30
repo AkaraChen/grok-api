@@ -82,7 +82,7 @@ pub enum Resource {
         #[command(subcommand)]
         command: VideoCommand,
     },
-    /// Web search (query)
+    /// Search (query = web_search, x = x_search)
     Search {
         #[command(subcommand)]
         command: SearchCommand,
@@ -283,6 +283,33 @@ pub enum SearchCommand {
         #[arg(long, env = "GROK_WEB_SEARCH_MODEL")]
         model: Option<String>,
     },
+    /// Search X via POST /responses with the official x_search tool
+    X {
+        /// Search query
+        #[arg(long)]
+        query: String,
+        /// x_search from_date (YYYY-MM-DD)
+        #[arg(long)]
+        from_date: Option<String>,
+        /// x_search to_date (YYYY-MM-DD)
+        #[arg(long)]
+        to_date: Option<String>,
+        /// Restrict to this X handle (repeatable). Official allowed_x_handles
+        #[arg(long)]
+        allowed_handle: Vec<String>,
+        /// Exclude this X handle (repeatable). Official excluded_x_handles
+        #[arg(long)]
+        excluded_handle: Vec<String>,
+        /// Official enable_image_understanding
+        #[arg(long)]
+        enable_image_understanding: bool,
+        /// Official enable_video_understanding
+        #[arg(long)]
+        enable_video_understanding: bool,
+        /// Responses model used by the official x_search tool
+        #[arg(long, env = "GROK_X_SEARCH_MODEL")]
+        model: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -329,7 +356,7 @@ Resources:
   auth       Authentication (login, status, refresh, logout)
   image      Image generation (generate, model list)
   video      Video generation (generate, task get, download, voice list)
-  search     Web search (query)
+  search     Search (query, x)
   mcp        MCP server (stdio, http)
   http       HTTP API (OpenAPI at /docs)
   config     CLI configuration (show, set)
@@ -629,5 +656,74 @@ mod tests {
             }
             other => panic!("unexpected {other:?}"),
         }
+    }
+
+    #[test]
+    fn parses_search_x() {
+        let cli = Cli::try_parse_from([
+            "grok-api",
+            "search",
+            "x",
+            "--query",
+            "what are people saying about xAI",
+            "--from-date",
+            "2024-01-01",
+            "--to-date",
+            "2024-03-15",
+            "--allowed-handle",
+            "elonmusk",
+            "--allowed-handle",
+            "xai",
+            "--enable-image-understanding",
+            "--model",
+            "grok-4.6",
+        ])
+        .unwrap();
+        match cli.resource {
+            Some(Resource::Search {
+                command:
+                    SearchCommand::X {
+                        query,
+                        from_date,
+                        to_date,
+                        allowed_handle,
+                        excluded_handle,
+                        enable_image_understanding,
+                        enable_video_understanding,
+                        model,
+                    },
+            }) => {
+                assert_eq!(query, "what are people saying about xAI");
+                assert_eq!(from_date.as_deref(), Some("2024-01-01"));
+                assert_eq!(to_date.as_deref(), Some("2024-03-15"));
+                assert_eq!(allowed_handle, ["elonmusk", "xai"]);
+                assert!(excluded_handle.is_empty());
+                assert!(enable_image_understanding);
+                assert!(!enable_video_understanding);
+                assert_eq!(model.as_deref(), Some("grok-4.6"));
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    fn search_x_help() -> String {
+        let mut cmd = Cli::command();
+        cmd.find_subcommand_mut("search")
+            .unwrap()
+            .find_subcommand_mut("x")
+            .unwrap()
+            .render_long_help()
+            .to_string()
+    }
+
+    #[test]
+    fn search_x_help_covers_official_fields() {
+        let help = search_x_help();
+        assert!(help.contains("from_date") || help.contains("from-date"));
+        assert!(help.contains("to_date") || help.contains("to-date"));
+        assert!(help.contains("allowed_x_handles"));
+        assert!(help.contains("excluded_x_handles"));
+        assert!(help.contains("enable_image_understanding"));
+        assert!(help.contains("enable_video_understanding"));
     }
 }
