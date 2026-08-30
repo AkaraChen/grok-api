@@ -8,7 +8,7 @@ pub struct WebSearchRequest {
     pub excluded_domains: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct WebSearchResult {
     pub query: String,
     pub content: String,

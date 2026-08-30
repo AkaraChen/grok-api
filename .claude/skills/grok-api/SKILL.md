@@ -1,6 +1,6 @@
 ---
 name: grok-api
-description: Run the grok-api CLI to generate or edit Grok Imagine images, start/poll/download Imagine videos, search the web via official web_search, serve MCP over stdio or streamable HTTP, and manage ~/.grok-api credentials. Use when the user asks to generate images or videos with Grok/xAI, animate a still, check a video task, download a clip, search with grok-api, start grok-api mcp, or log in with XAI_API_KEY / official grok auth. Do not use for the official grok TUI/coding agent, and do not invent Imagine or search fields the CLI does not expose.
+description: Run the grok-api CLI to generate or edit Grok Imagine images, start/poll/download Imagine videos, search the web via official web_search, serve MCP over stdio or streamable HTTP, serve a REST API with OpenAPI at /docs, and manage ~/.grok-api credentials. Use when the user asks to generate images or videos with Grok/xAI, animate a still, check a video task, download a clip, search with grok-api, start grok-api mcp or grok-api http, or log in with XAI_API_KEY / official grok auth. Do not use for the official grok TUI/coding agent, and do not invent Imagine or search fields the CLI does not expose.
 metadata:
   title: grok-api
   icon: "🛰️"
@@ -128,6 +128,31 @@ grok-api mcp http --bind 127.0.0.1:3920
 ```
 
 Tools: `image_generate`, `image_model_list`, `video_generate`, `video_task_get`, `video_download`, `video_voice_list`, `search_query`, `auth_status`, `config_show`. Field names match the CLI / official Imagine and web_search payloads.
+
+## HTTP
+
+Same resources as the CLI / MCP tools. Auth is the process credentials (`XAI_API_KEY`, `~/.grok-api`, or `--from-grok-cli`). Default bind is `127.0.0.1:8080` so it does not collide with `mcp http` (`127.0.0.1:3920`).
+
+```bash
+grok-api http
+grok-api http --bind 127.0.0.1:8080
+```
+
+OpenAPI UI is `/docs`. Spec is `/api-docs/openapi.json`.
+
+| Method | Path | CLI |
+| --- | --- | --- |
+| GET | `/auth/status` | `auth status` |
+| GET | `/config` | `config show` |
+| POST | `/image/generate` | `image generate` |
+| GET | `/image/models` | `image model list` |
+| POST | `/video/generate` | `video generate` |
+| GET | `/video/tasks/{task_id}` | `video task get` |
+| POST | `/video/download` | `video download` |
+| GET | `/video/voices` | `video voice list` |
+| POST | `/search/query` | `search query` |
+
+Request JSON fields match MCP / CLI flags (`prompt`, `allowed_domains`, `file_id`, …). Do not invent Imagine or search fields. Pass HTTP error bodies through unchanged.
 
 ## Config
 

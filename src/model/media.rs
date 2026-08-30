@@ -36,14 +36,14 @@ pub struct ImageGenerateRequest {
     pub image: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct GeneratedImage {
     pub url: Option<String>,
     pub b64_json: Option<String>,
     pub path: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct ImageGenerateResult {
     pub model: String,
     pub images: Vec<GeneratedImage>,
@@ -63,22 +63,23 @@ pub struct VideoGenerateRequest {
     pub poll_interval_secs: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VideoTask {
     pub request_id: String,
     pub status: String,
     #[serde(default)]
     pub video: Option<VideoAsset>,
     #[serde(default)]
+    #[schema(value_type = Option<Object>)]
     pub error: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VideoAsset {
     pub url: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct VideoGenerateResult {
     pub request_id: String,
     pub status: String,

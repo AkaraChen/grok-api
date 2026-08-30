@@ -92,6 +92,12 @@ pub enum Resource {
         #[command(subcommand)]
         command: Option<McpCommand>,
     },
+    /// HTTP API with OpenAPI docs at /docs
+    Http {
+        /// Bind address (default: 127.0.0.1:8080)
+        #[arg(long, default_value = "127.0.0.1:8080")]
+        bind: String,
+    },
     /// CLI configuration (show, set)
     Config {
         #[command(subcommand)]
@@ -325,6 +331,7 @@ Resources:
   video      Video generation (generate, task get, download, voice list)
   search     Web search (query)
   mcp        MCP server (stdio, http)
+  http       HTTP API (OpenAPI at /docs)
   config     CLI configuration (show, set)
 
 Global Flags:
@@ -545,6 +552,24 @@ mod tests {
             Some(Resource::Mcp {
                 command: Some(McpCommand::Http { bind }),
             }) => assert_eq!(bind, "127.0.0.1:4000"),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_http_bind() {
+        let cli = Cli::try_parse_from(["grok-api", "http", "--bind", "127.0.0.1:9090"]).unwrap();
+        match cli.resource {
+            Some(Resource::Http { bind }) => assert_eq!(bind, "127.0.0.1:9090"),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_http_default_bind() {
+        let cli = Cli::try_parse_from(["grok-api", "http"]).unwrap();
+        match cli.resource {
+            Some(Resource::Http { bind }) => assert_eq!(bind, "127.0.0.1:8080"),
             other => panic!("unexpected {other:?}"),
         }
     }

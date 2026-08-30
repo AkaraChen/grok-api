@@ -1,5 +1,6 @@
 mod cli;
 mod error;
+mod http;
 mod infra;
 mod mcp;
 mod model;
@@ -72,6 +73,7 @@ async fn dispatch(globals: Globals, resource: Resource) -> Result<()> {
         Resource::Video { command } => video_cmd(&ctx, &globals, output, command).await,
         Resource::Search { command } => search_cmd(&ctx, &globals, output, command).await,
         Resource::Mcp { command } => mcp_cmd(ctx, command).await,
+        Resource::Http { bind } => crate::http::serve(ctx, &bind).await,
         Resource::Config { command } => config_cmd(&globals, output, command),
     }
 }

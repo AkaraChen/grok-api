@@ -15,7 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1"
-axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio"] }
 base64 = "0.22"
 clap = { version = "4", features = ["derive", "env"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking", "stream"] }
@@ -25,6 +25,9 @@ serde_json = "1"
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "fs", "process", "io-std", "io-util", "net", "signal"] }
 toml = "0.8"
+utoipa = { version = "5", features = ["axum_extras"] }
+utoipa-axum = "0.2"
+utoipa-swagger-ui = { version = "9", features = ["axum", "vendored"] }
 
 # Official Grok Build crates, pinned to a main commit.
 xai-dirs = { git = "https://github.com/xai-org/grok-build", rev = "bc7f02eddd3d84085849dc19ed216f11c23b0571", package = "xai-dirs" }

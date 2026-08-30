@@ -9,7 +9,7 @@ pub const DEFAULT_SEARCH_MODEL: &str = "grok-4.6";
 pub const DEFAULT_TIMEOUT_SECS: u64 = 300;
 pub const DEFAULT_POLL_INTERVAL_SECS: u64 = 5;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum OutputFormat {
     #[default]
@@ -27,7 +27,7 @@ impl OutputFormat {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct AppConfig {
     #[serde(default)]
     pub auth_source: AuthSource,

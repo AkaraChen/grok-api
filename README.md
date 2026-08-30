@@ -10,6 +10,8 @@ It pins official [xai-org/grok-build](https://github.com/xai-org/grok-build) cra
 
 `xai-grok-tools` is not a compile-time dependency: its `tools-api` build.rs requires the monorepo's vendored `protoc`/`dotslash`.
 
+`grok-api http` serves the same CLI resources over Axum. OpenAPI (utoipa) is at `/docs`; the spec is `/api-docs/openapi.json`. Default bind is `127.0.0.1:8080`.
+
 ## Auth
 
 Two credential sources:
@@ -44,6 +46,8 @@ grok-api search query --query "xAI grok imagine API"
 grok-api search query --query "tokio spawn" --allowed-domain docs.rs --allowed-domain tokio.rs
 grok-api mcp
 grok-api mcp http --bind 127.0.0.1:3920
+grok-api http
+grok-api http --bind 127.0.0.1:8080
 grok-api config show
 ```
 
