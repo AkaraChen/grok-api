@@ -1,62 +1,39 @@
+<div align="center">
+
 # grok-api
 
-CLI for the Grok / xAI API. The command surface matches `mmx`:
+**CLI, MCP server, and local HTTP API for Grok Imagine, web search, and X search.**
+
+[![CI](https://github.com/AkaraChen/grok-api/actions/workflows/ci.yml/badge.svg)](https://github.com/AkaraChen/grok-api/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/AkaraChen/grok-api)](https://github.com/AkaraChen/grok-api/releases/latest)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org)
+
+One binary. Same command shape everywhere:
 
 ```text
-Usage: grok-api <resource> <command> [flags]
+grok-api <resource> <command> [flags]
 ```
 
-It pins official [xai-org/grok-build](https://github.com/xai-org/grok-build) crates (`xai-dirs`, `xai-grok-auth`, `xai-grok-env`, `xai-grok-paths`) and calls the same HTTP APIs the official tools use. Login is official `grok login` with `GROK_HOME` pointed at `~/.grok-api` instead of `~/.grok`.
+[Install](#install) · [Quick start](#quick-start) · [Usage](#usage) · [MCP](#mcp) · [HTTP](#http)
 
-`xai-grok-tools` is not a compile-time dependency: its `tools-api` build.rs requires the monorepo's vendored `protoc`/`dotslash`.
+</div>
 
-`grok-api http` serves the same CLI resources over Axum. OpenAPI (utoipa) is at `/docs`; the spec is `/api-docs/openapi.json`. Default bind is `127.0.0.1:8080`.
+---
 
-## Auth
+Generate and edit images, start and download videos, search the web or X — then expose the same resources over MCP or a local OpenAPI server. Credentials live in `~/.grok-api` so this CLI never writes `~/.grok` and never collides with official `grok`.
 
-Two credential sources:
+## Features
 
-1. **Read the official Grok CLI key** from `~/.grok/auth.json`:
-
-   ```bash
-   grok-api auth login --from-grok-cli
-   grok-api --from-grok-cli image generate --prompt "a cat"
-   ```
-
-2. **Same login as Grok CLI**, stored under `~/.grok-api`:
-
-   ```bash
-   grok-api auth login --oauth
-   grok-api auth login --device-auth
-   grok-api auth login --api-key xai-...
-   ```
-
-`--api-key` and `XAI_API_KEY` win over stored credentials. `auth logout --yes` only deletes `~/.grok-api/auth.json`. It never touches `~/.grok`.
-
-## Examples
-
-```bash
-grok-api image generate --prompt "A cat in a spacesuit on Mars" --aspect-ratio 16:9
-grok-api image generate --prompt "Logo design" --n 3 --out-dir ./generated/
-grok-api image generate --prompt "A cat" --out /tmp/cat.jpg
-grok-api image generate --prompt "combine these" --image subject.png --image style.png
-grok-api video generate --prompt "Ocean waves at sunset." --download sunset.mp4
-grok-api video generate --prompt "A robot painting." --async --quiet
-grok-api video task get --task-id <request_id>
-grok-api search query --query "xAI grok imagine API"
-grok-api search query --query "tokio spawn" --allowed-domain docs.rs --allowed-domain tokio.rs
-grok-api search x --query "What are people saying about xAI on X?"
-grok-api search x --query "xAI status" --allowed-handle elonmusk --from-date 2025-10-01 --to-date 2025-10-10
-grok-api mcp
-grok-api mcp http --bind 127.0.0.1:3920
-grok-api http
-grok-api http --bind 127.0.0.1:8080
-grok-api config show
-```
+| Surface | What you get |
+| --- | --- |
+| **Images** | Text-to-image and multi-image edits via Grok Imagine |
+| **Video** | Text-to-video and image-to-video, with poll, download, and TTS voices |
+| **Search** | Official `web_search` and `x_search` |
+| **MCP** | stdio for Cursor / Claude Desktop, or streamable HTTP |
+| **HTTP** | Same resources on localhost, with Swagger UI at `/docs` |
 
 ## Install
-
-The installer asks GitHub for the latest release and picks the archive that matches your OS and CPU. If `gh` is installed and logged in, it uses that OAuth token automatically so you stay under authenticated API limits. You can also set `GITHUB_TOKEN` or `GH_TOKEN`. Without a token, unauthenticated GitHub API limits apply; if you hit them, the script tells you to pass a token or download from the [latest release](https://github.com/AkaraChen/grok-api/releases/latest) page.
 
 ### Linux / macOS
 
@@ -64,9 +41,9 @@ The installer asks GitHub for the latest release and picks the archive that matc
 curl -fsSL https://raw.githubusercontent.com/AkaraChen/grok-api/main/install.sh | bash
 ```
 
-Installs to `~/.local/bin` (override with `GROK_API_INSTALL_DIR`).
+Installs to `~/.local/bin`. Override with `GROK_API_INSTALL_DIR`.
 
-### Windows (PowerShell)
+### Windows
 
 ```powershell
 irm https://raw.githubusercontent.com/AkaraChen/grok-api/main/install.ps1 | iex
@@ -74,33 +51,146 @@ irm https://raw.githubusercontent.com/AkaraChen/grok-api/main/install.ps1 | iex
 
 Installs to `%LOCALAPPDATA%\grok-api` and adds that directory to your user `PATH`.
 
-### Scoop
-
-After a release exists:
-
-```powershell
-scoop install https://github.com/AkaraChen/grok-api/releases/latest/download/grok-api.json
-```
-
-Winget cannot install a GitHub release URL directly (it needs a package in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs)), so it is not wired up here.
-
-### From source
+### Other options
 
 ```bash
+# Scoop
+scoop install https://github.com/AkaraChen/grok-api/releases/latest/download/grok-api.json
+
+# From this repo
 cargo install --path .
 ```
 
-### Manual download
+Prebuilt archives for Linux, macOS, and Windows (`x86_64` and `aarch64`) are on the [latest release](https://github.com/AkaraChen/grok-api/releases/latest).
 
-Binaries for Linux, macOS, and Windows (x86_64 and aarch64) are attached to each GitHub Release:
+<details>
+<summary>Installer notes</summary>
 
-<https://github.com/AkaraChen/grok-api/releases/latest>
+The installer asks GitHub for the latest release. If `gh` is installed and logged in, that OAuth token is used automatically. You can also set `GITHUB_TOKEN` or `GH_TOKEN`. Without a token, unauthenticated GitHub API limits apply; if you hit them, pass a token or download the archive from the [releases page](https://github.com/AkaraChen/grok-api/releases/latest).
 
-### Publish a release
+Winget cannot install a GitHub release URL directly — it needs a package in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) — so it is not wired up here.
 
-Push a version tag. GitHub Actions builds every platform and uploads the archives:
+</details>
+
+## Quick start
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+# Reuse an existing official Grok CLI login
+grok-api auth login --from-grok-cli
+
+# Or sign in into ~/.grok-api
+grok-api auth login --oauth
+grok-api auth login --device-auth
+grok-api auth login --api-key xai-...
+
+# Generate an image
+grok-api image generate --prompt "A cat in a spacesuit on Mars" --aspect-ratio 16:9
 ```
+
+`--api-key` and `XAI_API_KEY` override stored credentials. `auth logout --yes` deletes only `~/.grok-api/auth.json`. It never touches `~/.grok`.
+
+## Usage
+
+```text
+Resources:
+  auth       login, status, refresh, logout
+  image      generate, model list
+  video      generate, task get, download, voice list
+  search     query, x
+  mcp        stdio, http
+  http       OpenAPI at /docs
+  config     show, set
+```
+
+Add `--help` after any command for flags and defaults.
+
+### Images
+
+```bash
+grok-api image generate --prompt "A cat in a spacesuit on Mars" --aspect-ratio 16:9
+grok-api image generate --prompt "Logo design" --n 3 --out-dir ./generated/
+grok-api image generate --prompt "A cat" --out /tmp/cat.jpg
+grok-api image generate --prompt "combine these" --image subject.png --image style.png
+grok-api image model list
+```
+
+### Video
+
+```bash
+grok-api video generate --prompt "Ocean waves at sunset." --download sunset.mp4
+grok-api video generate --prompt "A robot painting." --async --quiet
+grok-api video task get --task-id <request_id>
+grok-api video download --file-id <request_id> --out out.mp4
+grok-api video voice list
+```
+
+### Search
+
+```bash
+grok-api search query --query "xAI grok imagine API"
+grok-api search query --query "tokio spawn" --allowed-domain docs.rs --allowed-domain tokio.rs
+grok-api search x --query "What are people saying about xAI on X?"
+grok-api search x --query "xAI status" --allowed-handle elonmusk --from-date 2025-10-01 --to-date 2025-10-10
+```
+
+### MCP
+
+Same tools as the CLI. Auth is the process credentials (`XAI_API_KEY`, `~/.grok-api`, or `--from-grok-cli`).
+
+```bash
+# Cursor / Claude Desktop (stdio — default)
+grok-api mcp
+
+# Streamable HTTP
+grok-api mcp http --bind 127.0.0.1:3920
+```
+
+### HTTP
+
+Same resources as the CLI and MCP. Default bind is `127.0.0.1:8080`.
+
+```bash
+grok-api http
+grok-api http --bind 127.0.0.1:8080
+```
+
+OpenAPI UI is `/docs`. Spec is `/api-docs/openapi.json`.
+
+| Method | Path | CLI |
+| --- | --- | --- |
+| `GET` | `/auth/status` | `auth status` |
+| `GET` | `/config` | `config show` |
+| `POST` | `/image/generate` | `image generate` |
+| `GET` | `/image/models` | `image model list` |
+| `POST` | `/video/generate` | `video generate` |
+| `GET` | `/video/tasks/{task_id}` | `video task get` |
+| `POST` | `/video/download` | `video download` |
+| `GET` | `/video/voices` | `video voice list` |
+| `POST` | `/search/query` | `search query` |
+| `POST` | `/search/x` | `search x` |
+
+### Config
+
+Stored under `~/.grok-api`.
+
+```bash
+grok-api config show
+grok-api config set --key default_search_model --value grok-4.6
+```
+
+## Global flags
+
+| Flag | Meaning |
+| --- | --- |
+| `--api-key` | Override all other auth (`XAI_API_KEY`) |
+| `--from-grok-cli` | Read `~/.grok/auth.json` for this invocation |
+| `--output json` | Machine-readable output |
+| `--quiet` | Payload only |
+| `--non-interactive` | No prompts (CI / agents) |
+| `--dry-run` | Print the request without calling the API |
+
+## License
+
+[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0)
+
+Working on the crate itself? See [AGENTS.md](AGENTS.md).
