@@ -53,6 +53,51 @@ grok-api config show
 
 ## Install
 
+The installer asks GitHub for the latest release and picks the archive that matches your OS and CPU. If `gh` is installed and logged in, it uses that OAuth token automatically so you stay under authenticated API limits. You can also set `GITHUB_TOKEN` or `GH_TOKEN`. Without a token, unauthenticated GitHub API limits apply; if you hit them, the script tells you to pass a token or download from the [latest release](https://github.com/AkaraChen/grok-api/releases/latest) page.
+
+### Linux / macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AkaraChen/grok-api/main/install.sh | bash
+```
+
+Installs to `~/.local/bin` (override with `GROK_API_INSTALL_DIR`).
+
+### Windows (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/AkaraChen/grok-api/main/install.ps1 | iex
+```
+
+Installs to `%LOCALAPPDATA%\grok-api` and adds that directory to your user `PATH`.
+
+### Scoop
+
+After a release exists:
+
+```powershell
+scoop install https://github.com/AkaraChen/grok-api/releases/latest/download/grok-api.json
+```
+
+Winget cannot install a GitHub release URL directly (it needs a package in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs)), so it is not wired up here.
+
+### From source
+
 ```bash
 cargo install --path .
+```
+
+### Manual download
+
+Binaries for Linux, macOS, and Windows (x86_64 and aarch64) are attached to each GitHub Release:
+
+<https://github.com/AkaraChen/grok-api/releases/latest>
+
+### Publish a release
+
+Push a version tag. GitHub Actions builds every platform and uploads the archives:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
 ```
