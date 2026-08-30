@@ -283,7 +283,7 @@ impl GrokApiMcp {
 
 #[tool_handler(
     name = "grok-api",
-    version = "0.1.0",
+    version = "0.1.1",
     instructions = "Thin grok-api MCP: image generate, video generate/task/download, official web_search and x_search, auth status. Do not invent Imagine or search fields.",
     router = self.tool_router
 )]
