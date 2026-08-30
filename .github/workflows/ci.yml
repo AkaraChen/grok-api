@@ -32,7 +32,7 @@ jobs:
           sudo mkdir -p /opt/pwsh
           sudo tar -xzf /tmp/pwsh.tgz -C /opt/pwsh
           sudo ln -sf /opt/pwsh/pwsh /usr/local/bin/pwsh
-          pwsh -NoProfile -Command '$PSVersionTable.PSVersion'
+          pwsh --version
       - name: Lint GitHub Actions workflows
         run: |
           set -euo pipefail

@@ -62,18 +62,20 @@ jobs:
 
       - name: Smoke-test native binary
         shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
           host="$(rustc -vV | sed -n 's/^host: //p')"
           ext=""
-          if [[ "${{ matrix.target }}" == *windows* ]]; then
+          if [[ "${TARGET}" == *windows* ]]; then
             ext=".exe"
           fi
-          bin="target/${{ matrix.target }}/release/grok-api${ext}"
-          if [[ "${{ matrix.target }}" == "${host}" ]]; then
+          bin="target/${TARGET}/release/grok-api${ext}"
+          if [[ "${TARGET}" == "${host}" ]]; then
             "${bin}" --help
           else
-            echo "skip smoke test; host=${host} target=${{ matrix.target }}"
+            echo "skip smoke test; host=${host} target=${TARGET}"
           fi
 
       - name: Package
