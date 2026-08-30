@@ -51,7 +51,11 @@ pub async fn task_get(ctx: &AuthContext, request_id: &str) -> Result<VideoTask> 
     client.get_video(request_id).await
 }
 
-pub async fn download(ctx: &AuthContext, file_id: &str, out: &PathBuf) -> Result<VideoGenerateResult> {
+pub async fn download(
+    ctx: &AuthContext,
+    file_id: &str,
+    out: &PathBuf,
+) -> Result<VideoGenerateResult> {
     let credential = auth::load_credential(ctx)?;
     let client = ImagineClient::new(
         &ctx.config.base_url,
@@ -71,6 +75,16 @@ pub async fn download(ctx: &AuthContext, file_id: &str, out: &PathBuf) -> Result
         client.get_video(file_id).await?
     };
     finish(&client, task, Some(out.clone())).await
+}
+
+pub async fn list_voices(ctx: &AuthContext) -> Result<serde_json::Value> {
+    let credential = auth::load_credential(ctx)?;
+    let client = ImagineClient::new(
+        &ctx.config.base_url,
+        credential,
+        Duration::from_secs(ctx.config.timeout),
+    )?;
+    client.list_voices().await
 }
 
 async fn finish(
