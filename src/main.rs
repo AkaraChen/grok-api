@@ -186,13 +186,6 @@ async fn image_cmd(
             value: response_format,
         }
     })?;
-    if globals.verbose {
-        eprintln!(
-            "image_gen tool={} command={}",
-            crate::infra::imagine::IMAGE_GEN_TOOL_NAME,
-            crate::infra::imagine::IMAGINE_COMMAND_NAME
-        );
-    }
     let result = image::generate(
         ctx,
         image::ImageGenerateOpts {
@@ -245,13 +238,6 @@ async fn video_cmd(
             r#async,
             poll_interval,
         } => {
-            if globals.verbose {
-                eprintln!(
-                    "video tool={} command={}",
-                    crate::infra::imagine::IMAGE_TO_VIDEO_TOOL_NAME,
-                    crate::infra::imagine::IMAGINE_VIDEO_COMMAND_NAME
-                );
-            }
             let result = video::generate(
                 ctx,
                 VideoGenerateRequest {

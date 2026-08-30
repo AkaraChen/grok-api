@@ -16,11 +16,6 @@ use crate::model::media::{
 const SESSION_TOKEN_HEADER: &str = "X-XAI-Token-Auth";
 const SESSION_TOKEN_VALUE: &str = "xai-grok-cli";
 
-pub const IMAGE_GEN_TOOL_NAME: &str = "image_gen";
-pub const IMAGINE_COMMAND_NAME: &str = "imagine";
-pub const IMAGE_TO_VIDEO_TOOL_NAME: &str = "image_to_video";
-pub const IMAGINE_VIDEO_COMMAND_NAME: &str = "imagine-video";
-
 pub fn official_user_agent() -> String {
     format!("grok-api/{}", env!("CARGO_PKG_VERSION"))
 }
