@@ -15,7 +15,7 @@ use crate::model::auth::AuthStatus;
 use crate::model::config::{AppConfig, DEFAULT_POLL_INTERVAL_SECS};
 use crate::model::media::{
     ImageGenerateRequest, ImageGenerateResult, ResponseFormat, VideoGenerateRequest,
-    VideoGenerateResult, VideoTask,
+    VideoGenerateResult, VideoTask, image_refs,
 };
 use crate::model::search::{WebSearchRequest, WebSearchResult};
 use crate::service::auth::{self, AuthContext};
@@ -62,6 +62,7 @@ struct ImageGenerateBody {
     quality: Option<String>,
     response_format: Option<String>,
     image: Option<String>,
+    images: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -234,7 +235,7 @@ async fn image_generate(
                 resolution: body.resolution,
                 quality: body.quality,
                 response_format,
-                image: body.image,
+                images: image_refs(body.image, body.images),
             },
             out: body.out.map(PathBuf::from),
             out_dir: body.out_dir.map(PathBuf::from),

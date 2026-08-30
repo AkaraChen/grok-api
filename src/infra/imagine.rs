@@ -76,10 +76,10 @@ impl ImagineClient {
         &self,
         request: &ImageGenerateRequest,
     ) -> Result<ImageGenerateResult> {
-        let endpoint = if request.image.is_some() {
-            format!("{}/images/edits", self.base_url)
-        } else {
+        let endpoint = if request.images.is_empty() {
             format!("{}/images/generations", self.base_url)
+        } else {
+            format!("{}/images/edits", self.base_url)
         };
         let body = image_generate_body(request)?;
         let value = self.post_json(&endpoint, body).await?;
@@ -248,11 +248,21 @@ pub fn image_generate_body(request: &ImageGenerateRequest) -> Result<Value> {
     if let Some(quality) = &request.quality {
         body["quality"] = json!(quality);
     }
-    if let Some(image) = &request.image {
-        body["image"] = json!({
-            "url": image_ref(image)?,
-            "type": "image_url",
-        });
+    match request.images.as_slice() {
+        [] => {}
+        [image] => {
+            body["image"] = json!({
+                "url": image_ref(image)?,
+                "type": "image_url",
+            });
+        }
+        images => {
+            let refs: Result<Vec<Value>> = images
+                .iter()
+                .map(|image| Ok(json!({ "url": image_ref(image)? })))
+                .collect();
+            body["images"] = json!(refs?);
+        }
     }
     Ok(body)
 }
@@ -379,7 +389,7 @@ mod tests {
             resolution: None,
             quality: None,
             response_format: ResponseFormat::Url,
-            image: None,
+            images: Vec::new(),
         }
     }
 
@@ -405,6 +415,33 @@ mod tests {
         assert_eq!(body["resolution"], "1k");
         assert_eq!(body["response_format"], "url");
         assert!(body.get("quality").is_none());
+    }
+
+    #[test]
+    fn image_body_single_edit_sends_image_object() {
+        let mut request = image_request();
+        request.images = vec!["https://example.com/a.png".into()];
+        let body = image_generate_body(&request).unwrap();
+        assert_eq!(body["image"]["url"], "https://example.com/a.png");
+        assert!(body.get("images").is_none());
+    }
+
+    #[test]
+    fn image_body_multi_edit_sends_images_array() {
+        let mut request = image_request();
+        request.images = vec![
+            "https://example.com/a.png".into(),
+            "https://example.com/b.png".into(),
+        ];
+        let body = image_generate_body(&request).unwrap();
+        assert!(body.get("image").is_none());
+        assert_eq!(
+            body["images"],
+            json!([
+                { "url": "https://example.com/a.png" },
+                { "url": "https://example.com/b.png" }
+            ])
+        );
     }
 
     #[test]

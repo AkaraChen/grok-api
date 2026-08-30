@@ -58,7 +58,7 @@ grok-api --non-interactive --output json image generate \
 | Flag | Notes |
 | --- | --- |
 | `--prompt` | Required |
-| `--image` | Local path or URL; switches to image edit |
+| `--image` | Repeatable path or URL; switches to image edit. One image sends `image`; more send `images` |
 | `--n` | 1–10. `--out` requires `--n 1` |
 | `--out` / `--out-dir` / `--out-prefix` | Save files. Prefix default `image` |
 | `--aspect-ratio` | `auto`, `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, `3:2`, `2:3`, `2:1`, `1:2`, `21:9`, `19.5:9` |
@@ -68,6 +68,15 @@ grok-api --non-interactive --output json image generate \
 | `--model` | Default `grok-imagine-image-2.0`. List with `image model list` |
 
 List models: `grok-api --output json image model list`.
+
+Multi-image edit (official `images` array):
+
+```bash
+grok-api --non-interactive --output json image generate \
+  --prompt "combine these into one scene" \
+  --image subject.png \
+  --image style.png
+```
 
 ## Video
 

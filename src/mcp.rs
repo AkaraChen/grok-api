@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result as ApiResult};
 use crate::model::config::DEFAULT_POLL_INTERVAL_SECS;
-use crate::model::media::{ImageGenerateRequest, ResponseFormat, VideoGenerateRequest};
+use crate::model::media::{ImageGenerateRequest, ResponseFormat, VideoGenerateRequest, image_refs};
 use crate::model::search::WebSearchRequest;
 use crate::service::auth::{self, AuthContext};
 use crate::service::{config as config_service, image, search, video};
@@ -46,6 +46,7 @@ struct ImageGenerateArgs {
     quality: Option<String>,
     response_format: Option<String>,
     image: Option<String>,
+    images: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -111,7 +112,7 @@ impl GrokApiMcp {
                     resolution: args.resolution,
                     quality: args.quality,
                     response_format,
-                    image: args.image,
+                    images: image_refs(args.image, args.images),
                 },
                 out: args.out.map(PathBuf::from),
                 out_dir: args.out_dir.map(PathBuf::from),
@@ -337,6 +338,21 @@ mod tests {
         assert_eq!(args.aspect_ratio.as_deref(), Some("16:9"));
         assert_eq!(args.n, Some(1));
         assert_eq!(args.quality.as_deref(), Some("auto"));
+    }
+
+    #[test]
+    fn image_args_merge_single_and_multi_refs() {
+        assert_eq!(
+            image_refs(Some("a.png".into()), None),
+            vec!["a.png".to_string()]
+        );
+        assert_eq!(
+            image_refs(
+                Some("ignored.png".into()),
+                Some(vec!["a.png".into(), "b.png".into()])
+            ),
+            vec!["a.png".to_string(), "b.png".to_string()]
+        );
     }
 
     #[test]

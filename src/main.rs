@@ -203,7 +203,7 @@ async fn image_cmd(
             model,
             resolution,
             quality,
-            image,
+            image: images,
         } => {
             let response_format = ResponseFormat::parse(&response_format).ok_or_else(|| {
                 crate::error::Error::InvalidValue {
@@ -222,7 +222,7 @@ async fn image_cmd(
                         resolution,
                         quality,
                         response_format,
-                        image,
+                        images,
                     },
                     out,
                     out_dir,
