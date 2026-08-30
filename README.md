@@ -45,6 +45,8 @@ grok-api video generate --prompt "A robot painting." --async --quiet
 grok-api video task get --task-id <request_id>
 grok-api search query --query "xAI grok imagine API"
 grok-api search query --query "tokio spawn" --allowed-domain docs.rs --allowed-domain tokio.rs
+grok-api search x --query "What are people saying about xAI on X?"
+grok-api search x --query "xAI status" --allowed-handle elonmusk --from-date 2025-10-01 --to-date 2025-10-10
 grok-api mcp
 grok-api mcp http --bind 127.0.0.1:3920
 grok-api http

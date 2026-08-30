@@ -19,7 +19,7 @@ use crate::error::Result;
 use crate::infra::output::{emit, emit_text};
 use crate::model::config::{DEFAULT_POLL_INTERVAL_SECS, OutputFormat};
 use crate::model::media::{ImageGenerateRequest, ResponseFormat, VideoGenerateRequest};
-use crate::model::search::WebSearchRequest;
+use crate::model::search::{WebSearchRequest, XSearchRequest};
 use crate::service::auth::AuthContext;
 use crate::service::{auth, config as config_service, image, search, video};
 
@@ -382,44 +382,83 @@ async fn search_cmd(
     output: OutputFormat,
     command: SearchCommand,
 ) -> Result<()> {
-    let SearchCommand::Query {
-        query,
-        allowed_domain,
-        excluded_domain,
-        model,
-    } = command;
-    let result = search::query(
-        ctx,
-        WebSearchRequest {
+    match command {
+        SearchCommand::Query {
             query,
-            model: model.unwrap_or_else(|| ctx.config.default_search_model.clone()),
-            allowed_domains: nonempty(allowed_domain),
-            excluded_domains: nonempty(excluded_domain),
-        },
-        globals.dry_run,
-    )
-    .await?;
-    let text = if globals.dry_run {
-        "dry-run: would call POST /responses".to_string()
-    } else {
-        format_search_text(&result)
-    };
-    emit(output, globals.quiet, text, &result)
+            allowed_domain,
+            excluded_domain,
+            model,
+        } => {
+            let result = search::query(
+                ctx,
+                WebSearchRequest {
+                    query,
+                    model: model.unwrap_or_else(|| ctx.config.default_search_model.clone()),
+                    allowed_domains: nonempty(allowed_domain),
+                    excluded_domains: nonempty(excluded_domain),
+                },
+                globals.dry_run,
+            )
+            .await?;
+            let text = if globals.dry_run {
+                "dry-run: would call POST /responses".to_string()
+            } else {
+                format_search_text(&result.content, &result.citations)
+            };
+            emit(output, globals.quiet, text, &result)
+        }
+        SearchCommand::X {
+            query,
+            from_date,
+            to_date,
+            allowed_handle,
+            excluded_handle,
+            enable_image_understanding,
+            enable_video_understanding,
+            model,
+        } => {
+            let result = search::x_query(
+                ctx,
+                XSearchRequest {
+                    query,
+                    model: model.unwrap_or_else(|| ctx.config.default_search_model.clone()),
+                    from_date: nonempty_string(from_date),
+                    to_date: nonempty_string(to_date),
+                    allowed_x_handles: nonempty(allowed_handle),
+                    excluded_x_handles: nonempty(excluded_handle),
+                    enable_image_understanding,
+                    enable_video_understanding,
+                },
+                globals.dry_run,
+            )
+            .await?;
+            let text = if globals.dry_run {
+                "dry-run: would call POST /responses".to_string()
+            } else {
+                format_search_text(&result.content, &result.citations)
+            };
+            emit(output, globals.quiet, text, &result)
+        }
+    }
 }
 
-fn nonempty(domains: Vec<String>) -> Option<Vec<String>> {
-    if domains.is_empty() {
+fn nonempty(values: Vec<String>) -> Option<Vec<String>> {
+    if values.is_empty() {
         None
     } else {
-        Some(domains)
+        Some(values)
     }
 }
 
-fn format_search_text(result: &crate::model::search::WebSearchResult) -> String {
-    if result.citations.is_empty() {
-        return result.content.clone();
+fn nonempty_string(value: Option<String>) -> Option<String> {
+    value.filter(|value| !value.is_empty())
+}
+
+fn format_search_text(content: &str, citations: &[String]) -> String {
+    if citations.is_empty() {
+        return content.to_string();
     }
-    format!("{}\n\n{}", result.content, result.citations.join("\n"))
+    format!("{content}\n\n{}", citations.join("\n"))
 }
 
 async fn mcp_cmd(ctx: AuthContext, command: Option<McpCommand>) -> Result<()> {

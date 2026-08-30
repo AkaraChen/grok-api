@@ -1,6 +1,6 @@
 ---
 name: grok-api
-description: Run the grok-api CLI to generate or edit Grok Imagine images, start/poll/download Imagine videos, search the web via official web_search, serve MCP over stdio or streamable HTTP, serve a REST API with OpenAPI at /docs, and manage ~/.grok-api credentials. Use when the user asks to generate images or videos with Grok/xAI, animate a still, check a video task, download a clip, search with grok-api, start grok-api mcp or grok-api http, or log in with XAI_API_KEY / official grok auth. Do not use for the official grok TUI/coding agent, and do not invent Imagine or search fields the CLI does not expose.
+description: Run the grok-api CLI to generate or edit Grok Imagine images, start/poll/download Imagine videos, search the web via official web_search, search X via official x_search, serve MCP over stdio or streamable HTTP, serve a REST API with OpenAPI at /docs, and manage ~/.grok-api credentials. Use when the user asks to generate images or videos with Grok/xAI, animate a still, check a video task, download a clip, search with grok-api, start grok-api mcp or grok-api http, or log in with XAI_API_KEY / official grok auth. Do not use for the official grok TUI/coding agent, and do not invent Imagine or search fields the CLI does not expose.
 metadata:
   title: grok-api
   icon: "🛰️"
@@ -113,14 +113,18 @@ grok-api video download --file-id <request_id> --out out.mp4
 
 ## Search
 
-Official `web_search` tool via `POST /responses`. Default model `grok-4.6` (`GROK_WEB_SEARCH_MODEL` or `--model`).
+Official `web_search` and `x_search` tools via `POST /responses`. Default model `grok-4.6` (`GROK_WEB_SEARCH_MODEL` / `GROK_X_SEARCH_MODEL` or `--model`).
 
 ```bash
 grok-api --non-interactive --output json search query --query "xAI grok imagine API"
 grok-api search query --query "tokio spawn" --allowed-domain docs.rs --allowed-domain tokio.rs
+grok-api --non-interactive --output json search x --query "What are people saying about xAI on X?"
+grok-api search x --query "xAI status" --allowed-handle elonmusk --from-date 2025-10-01 --to-date 2025-10-10
 ```
 
 `--allowed-domain` and `--excluded-domain` are mutually exclusive on the API. Do not send both. JSON fields: `query`, `content`, `citations`, `allowed_domains`.
+
+`search x` forwards official `x_search` fields: `--from-date`, `--to-date`, `--allowed-handle`, `--excluded-handle`, `--enable-image-understanding`, `--enable-video-understanding`. `--allowed-handle` and `--excluded-handle` are mutually exclusive on the API. Do not send both. JSON fields: `query`, `content`, `citations`, `from_date`, `to_date`, `allowed_x_handles`, `excluded_x_handles`.
 
 ## MCP
 
@@ -136,7 +140,7 @@ grok-api mcp stdio
 grok-api mcp http --bind 127.0.0.1:3920
 ```
 
-Tools: `image_generate`, `image_model_list`, `video_generate`, `video_task_get`, `video_download`, `video_voice_list`, `search_query`, `auth_status`, `config_show`. Field names match the CLI / official Imagine and web_search payloads.
+Tools: `image_generate`, `image_model_list`, `video_generate`, `video_task_get`, `video_download`, `video_voice_list`, `search_query`, `search_x`, `auth_status`, `config_show`. Field names match the CLI / official Imagine, web_search, and x_search payloads.
 
 ## HTTP
 
@@ -160,8 +164,9 @@ OpenAPI UI is `/docs`. Spec is `/api-docs/openapi.json`.
 | POST | `/video/download` | `video download` |
 | GET | `/video/voices` | `video voice list` |
 | POST | `/search/query` | `search query` |
+| POST | `/search/x` | `search x` |
 
-Request JSON fields match MCP / CLI flags (`prompt`, `allowed_domains`, `file_id`, …). Do not invent Imagine or search fields. Pass HTTP error bodies through unchanged.
+Request JSON fields match MCP / CLI flags (`prompt`, `allowed_domains`, `allowed_x_handles`, `file_id`, …). Do not invent Imagine or search fields. Pass HTTP error bodies through unchanged.
 
 ## Config
 
@@ -178,5 +183,5 @@ Keys: `auth_source`, `base_url`, `output`, `timeout`, `api_key`, `default_image_
 
 - Call official `grok` except as the login helper this CLI already wraps.
 - Invent flags, JSON fields, quality values, model allowlists, or video status machines.
-- Use `--quality high`, `--out` with `--n` other than 1, or both search domain lists.
+- Use `--quality high`, `--out` with `--n` other than 1, both search domain lists, or both X handle lists.
 - Treat this skill as permission to change grok-api internals; implementation rules live in repo `AGENTS.md`.

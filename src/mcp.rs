@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result as ApiResult};
 use crate::model::config::DEFAULT_POLL_INTERVAL_SECS;
 use crate::model::media::{ImageGenerateRequest, ResponseFormat, VideoGenerateRequest, image_refs};
-use crate::model::search::WebSearchRequest;
+use crate::model::search::{WebSearchRequest, XSearchRequest};
 use crate::service::auth::{self, AuthContext};
 use crate::service::{config as config_service, image, search, video};
 
@@ -85,6 +85,19 @@ struct SearchQueryArgs {
     query: String,
     allowed_domains: Option<Vec<String>>,
     excluded_domains: Option<Vec<String>>,
+    model: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct SearchXArgs {
+    query: String,
+    from_date: Option<String>,
+    to_date: Option<String>,
+    allowed_x_handles: Option<Vec<String>>,
+    excluded_x_handles: Option<Vec<String>>,
+    enable_image_understanding: Option<bool>,
+    enable_video_understanding: Option<bool>,
     model: Option<String>,
 }
 
@@ -220,6 +233,34 @@ impl GrokApiMcp {
         }
     }
 
+    #[tool(description = "Search X via grok-api search x (official x_search)")]
+    async fn search_x(
+        &self,
+        Parameters(args): Parameters<SearchXArgs>,
+    ) -> std::result::Result<CallToolResult, McpError> {
+        match search::x_query(
+            &self.ctx,
+            XSearchRequest {
+                query: args.query,
+                model: args
+                    .model
+                    .unwrap_or_else(|| self.ctx.config.default_search_model.clone()),
+                from_date: nonempty_string(args.from_date),
+                to_date: nonempty_string(args.to_date),
+                allowed_x_handles: nonempty(args.allowed_x_handles),
+                excluded_x_handles: nonempty(args.excluded_x_handles),
+                enable_image_understanding: args.enable_image_understanding.unwrap_or(false),
+                enable_video_understanding: args.enable_video_understanding.unwrap_or(false),
+            },
+            false,
+        )
+        .await
+        {
+            Ok(result) => json_ok(&result),
+            Err(error) => Ok(tool_err(error)),
+        }
+    }
+
     #[tool(description = "Show grok-api authentication status")]
     fn auth_status(&self) -> std::result::Result<CallToolResult, McpError> {
         match auth::status(&self.ctx) {
@@ -243,7 +284,7 @@ impl GrokApiMcp {
 #[tool_handler(
     name = "grok-api",
     version = "0.1.0",
-    instructions = "Thin grok-api MCP: image generate, video generate/task/download, official web_search, auth status. Do not invent Imagine or search fields.",
+    instructions = "Thin grok-api MCP: image generate, video generate/task/download, official web_search and x_search, auth status. Do not invent Imagine or search fields.",
     router = self.tool_router
 )]
 impl ServerHandler for GrokApiMcp {}
@@ -286,8 +327,12 @@ pub async fn serve_http(ctx: AuthContext, bind: &str) -> ApiResult<()> {
     Ok(())
 }
 
-fn nonempty(domains: Option<Vec<String>>) -> Option<Vec<String>> {
-    domains.filter(|domains| !domains.is_empty())
+fn nonempty(values: Option<Vec<String>>) -> Option<Vec<String>> {
+    values.filter(|values| !values.is_empty())
+}
+
+fn nonempty_string(value: Option<String>) -> Option<String> {
+    value.filter(|value| !value.is_empty())
 }
 
 fn json_ok<T: Serialize>(value: &T) -> std::result::Result<CallToolResult, McpError> {
@@ -315,6 +360,7 @@ mod tests {
             "video_download",
             "video_voice_list",
             "search_query",
+            "search_x",
             "auth_status",
             "config_show",
         ] {
@@ -364,5 +410,22 @@ mod tests {
         assert_eq!(args.query, "tokio");
         assert_eq!(args.allowed_domains, Some(vec!["docs.rs".into()]));
         assert!(args.excluded_domains.is_none());
+    }
+
+    #[test]
+    fn search_x_args_forward_official_x_search_fields() {
+        let args: SearchXArgs = parse(serde_json::json!({
+            "query": "xAI on X",
+            "from_date": "2024-01-01",
+            "allowed_x_handles": ["elonmusk"],
+            "enable_image_understanding": true
+        }));
+        assert_eq!(args.query, "xAI on X");
+        assert_eq!(args.from_date.as_deref(), Some("2024-01-01"));
+        assert!(args.to_date.is_none());
+        assert_eq!(args.allowed_x_handles, Some(vec!["elonmusk".into()]));
+        assert!(args.excluded_x_handles.is_none());
+        assert_eq!(args.enable_image_understanding, Some(true));
+        assert!(args.enable_video_understanding.is_none());
     }
 }

@@ -2,9 +2,9 @@ use serde_json::{Value, json};
 
 use crate::error::Result;
 use crate::infra::imagine::ImagineClient;
-use crate::model::search::{WebSearchRequest, WebSearchResult};
+use crate::model::search::{WebSearchRequest, WebSearchResult, XSearchRequest, XSearchResult};
 
-/// Official `web_search` tool request fields from grok-build
+/// Official `web_search` / `x_search` tool request fields from grok-build
 /// `WebSearchClient::build_request_json`.
 const STORE: bool = false;
 const TEMPERATURE: f64 = 0.1;
@@ -13,19 +13,40 @@ const MAX_OUTPUT_TOKENS: u32 = 8192;
 
 pub async fn search(client: &ImagineClient, request: &WebSearchRequest) -> Result<WebSearchResult> {
     let endpoint = format!("{}/responses", client.base_url());
-    let body = search_request_body(request);
-    let value = client.post_json(&endpoint, body).await?;
+    let value = client
+        .post_json(&endpoint, search_request_body(request))
+        .await?;
     Ok(parse_search_response(request, value))
 }
 
+pub async fn x_search(client: &ImagineClient, request: &XSearchRequest) -> Result<XSearchResult> {
+    let endpoint = format!("{}/responses", client.base_url());
+    let value = client
+        .post_json(&endpoint, x_search_request_body(request))
+        .await?;
+    Ok(parse_x_search_response(request, value))
+}
+
 pub fn search_request_body(request: &WebSearchRequest) -> Value {
-    json!({
-        "model": request.model,
-        "input": request.query,
-        "tools": [web_search_tool_entry(
+    responses_body(
+        &request.model,
+        &request.query,
+        web_search_tool_entry(
             request.allowed_domains.as_deref(),
             request.excluded_domains.as_deref(),
-        )],
+        ),
+    )
+}
+
+pub fn x_search_request_body(request: &XSearchRequest) -> Value {
+    responses_body(&request.model, &request.query, x_search_tool_entry(request))
+}
+
+fn responses_body(model: &str, query: &str, tool: Value) -> Value {
+    json!({
+        "model": model,
+        "input": query,
+        "tools": [tool],
         "store": STORE,
         "temperature": TEMPERATURE,
         "top_p": TOP_P,
@@ -54,17 +75,68 @@ fn web_search_tool_entry(
     tool
 }
 
-fn nonempty(domains: Option<&[String]>) -> Option<&[String]> {
-    domains.filter(|domains| !domains.is_empty())
+/// Official wire shape from grok-build `XSearchOptions::to_tool_entry`, plus
+/// public Responses `x_search` keys (`allowed_x_handles`, `excluded_x_handles`,
+/// `enable_image_understanding`, `enable_video_understanding`).
+fn x_search_tool_entry(request: &XSearchRequest) -> Value {
+    let mut tool = json!({ "type": "x_search" });
+    if let Some(from_date) = nonempty_str(request.from_date.as_deref()) {
+        tool["from_date"] = json!(from_date);
+    }
+    if let Some(to_date) = nonempty_str(request.to_date.as_deref()) {
+        tool["to_date"] = json!(to_date);
+    }
+    if let Some(handles) = nonempty(request.allowed_x_handles.as_deref()) {
+        tool["allowed_x_handles"] = json!(handles);
+    }
+    if let Some(handles) = nonempty(request.excluded_x_handles.as_deref()) {
+        tool["excluded_x_handles"] = json!(handles);
+    }
+    if request.enable_image_understanding {
+        tool["enable_image_understanding"] = json!(true);
+    }
+    if request.enable_video_understanding {
+        tool["enable_video_understanding"] = json!(true);
+    }
+    tool
+}
+
+fn nonempty(values: Option<&[String]>) -> Option<&[String]> {
+    values.filter(|values| !values.is_empty())
+}
+
+fn nonempty_str(value: Option<&str>) -> Option<&str> {
+    value.filter(|value| !value.is_empty())
 }
 
 pub fn parse_search_response(request: &WebSearchRequest, value: Value) -> WebSearchResult {
+    let (content, citations) = parse_output(value);
     WebSearchResult {
         query: request.query.clone(),
-        content: output_text(&value).unwrap_or_else(|| "No search results found.".to_string()),
-        citations: extract_citations(&value),
+        content,
+        citations,
         allowed_domains: request.allowed_domains.clone(),
     }
+}
+
+pub fn parse_x_search_response(request: &XSearchRequest, value: Value) -> XSearchResult {
+    let (content, citations) = parse_output(value);
+    XSearchResult {
+        query: request.query.clone(),
+        content,
+        citations,
+        from_date: request.from_date.clone(),
+        to_date: request.to_date.clone(),
+        allowed_x_handles: request.allowed_x_handles.clone(),
+        excluded_x_handles: request.excluded_x_handles.clone(),
+    }
+}
+
+fn parse_output(value: Value) -> (String, Vec<String>) {
+    (
+        output_text(&value).unwrap_or_else(|| "No search results found.".to_string()),
+        extract_citations(&value),
+    )
 }
 
 fn output_text(value: &Value) -> Option<String> {
@@ -139,7 +211,7 @@ fn extract_citations(value: &Value) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::search::WebSearchRequest;
+    use crate::model::search::{WebSearchRequest, XSearchRequest};
 
     fn request() -> WebSearchRequest {
         WebSearchRequest {
@@ -147,6 +219,19 @@ mod tests {
             model: "grok-4.6".into(),
             allowed_domains: None,
             excluded_domains: None,
+        }
+    }
+
+    fn x_request() -> XSearchRequest {
+        XSearchRequest {
+            query: "q".into(),
+            model: "grok-4.6".into(),
+            from_date: None,
+            to_date: None,
+            allowed_x_handles: None,
+            excluded_x_handles: None,
+            enable_image_understanding: false,
+            enable_video_understanding: false,
         }
     }
 
@@ -189,6 +274,79 @@ mod tests {
         request.excluded_domains = Some(Vec::new());
         let body = search_request_body(&request);
         assert_eq!(body["tools"][0], json!({ "type": "web_search" }));
+    }
+
+    #[test]
+    fn x_body_matches_official_x_search_defaults() {
+        let body = x_search_request_body(&x_request());
+        assert_eq!(body["model"], "grok-4.6");
+        assert_eq!(body["input"], "q");
+        assert_eq!(body["store"], false);
+        assert_eq!(body["temperature"], 0.1);
+        assert_eq!(body["top_p"], 0.95);
+        assert_eq!(body["max_output_tokens"], 8192);
+        assert_eq!(body["tools"][0], json!({ "type": "x_search" }));
+    }
+
+    #[test]
+    fn x_body_dates_match_grok_build_tool_entry() {
+        let mut request = x_request();
+        request.from_date = Some("2024-01-01".into());
+        request.to_date = Some("2024-03-15".into());
+        let body = x_search_request_body(&request);
+        assert_eq!(
+            body["tools"][0],
+            json!({
+                "type": "x_search",
+                "from_date": "2024-01-01",
+                "to_date": "2024-03-15",
+            })
+        );
+    }
+
+    #[test]
+    fn x_body_empty_dates_and_handles_emit_bare_tool() {
+        let mut request = x_request();
+        request.from_date = Some(String::new());
+        request.to_date = Some(String::new());
+        request.allowed_x_handles = Some(Vec::new());
+        request.excluded_x_handles = Some(Vec::new());
+        let body = x_search_request_body(&request);
+        assert_eq!(body["tools"][0], json!({ "type": "x_search" }));
+    }
+
+    #[test]
+    fn x_body_forwards_official_handle_and_media_fields() {
+        let mut request = x_request();
+        request.allowed_x_handles = Some(vec!["elonmusk".into(), "xai".into()]);
+        request.enable_image_understanding = true;
+        request.enable_video_understanding = true;
+        let body = x_search_request_body(&request);
+        assert_eq!(
+            body["tools"][0],
+            json!({
+                "type": "x_search",
+                "allowed_x_handles": ["elonmusk", "xai"],
+                "enable_image_understanding": true,
+                "enable_video_understanding": true,
+            })
+        );
+        assert!(body["tools"][0].get("excluded_x_handles").is_none());
+    }
+
+    #[test]
+    fn x_body_excluded_handles_only() {
+        let mut request = x_request();
+        request.excluded_x_handles = Some(vec!["spam".into()]);
+        let body = x_search_request_body(&request);
+        assert_eq!(
+            body["tools"][0],
+            json!({
+                "type": "x_search",
+                "excluded_x_handles": ["spam"],
+            })
+        );
+        assert!(body["tools"][0].get("allowed_x_handles").is_none());
     }
 
     fn response_json() -> Value {
@@ -246,6 +404,20 @@ mod tests {
             result.citations,
             ["https://www.rust-lang.org/", "https://docs.rs/"]
         );
+    }
+
+    #[test]
+    fn parse_x_extracts_text_and_echoes_bounds() {
+        let mut request = x_request();
+        request.from_date = Some("2024-01-01".into());
+        let result = parse_x_search_response(&request, response_json());
+        assert_eq!(result.content, "Here is some info about Rust.");
+        assert_eq!(
+            result.citations,
+            ["https://www.rust-lang.org/", "https://docs.rs/"]
+        );
+        assert_eq!(result.from_date.as_deref(), Some("2024-01-01"));
+        assert!(result.to_date.is_none());
     }
 
     #[test]

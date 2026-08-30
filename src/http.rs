@@ -17,7 +17,7 @@ use crate::model::media::{
     ImageGenerateRequest, ImageGenerateResult, ResponseFormat, VideoGenerateRequest,
     VideoGenerateResult, VideoTask, image_refs,
 };
-use crate::model::search::{WebSearchRequest, WebSearchResult};
+use crate::model::search::{WebSearchRequest, WebSearchResult, XSearchRequest, XSearchResult};
 use crate::service::auth::{self, AuthContext};
 use crate::service::{config as config_service, image, search, video};
 
@@ -25,14 +25,14 @@ use crate::service::{config as config_service, image, search, video};
 #[openapi(
     info(
         title = "grok-api",
-        description = "Thin HTTP glue over grok-api CLI resources. Same fields as the CLI / official Imagine and web_search payloads."
+        description = "Thin HTTP glue over grok-api CLI resources. Same fields as the CLI / official Imagine, web_search, and x_search payloads."
     ),
     tags(
         (name = "auth", description = "Authentication status"),
         (name = "config", description = "CLI configuration"),
         (name = "image", description = "Imagine image generation"),
         (name = "video", description = "Imagine video generation"),
-        (name = "search", description = "Official web_search via POST /responses")
+        (name = "search", description = "Official web_search and x_search via POST /responses")
     )
 )]
 struct ApiDoc;
@@ -95,6 +95,18 @@ struct SearchQueryBody {
     model: Option<String>,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+struct SearchXBody {
+    query: String,
+    from_date: Option<String>,
+    to_date: Option<String>,
+    allowed_x_handles: Option<Vec<String>>,
+    excluded_x_handles: Option<Vec<String>>,
+    enable_image_understanding: Option<bool>,
+    enable_video_understanding: Option<bool>,
+    model: Option<String>,
+}
+
 struct ApiError(Error);
 
 impl From<Error> for ApiError {
@@ -145,6 +157,7 @@ fn api_router() -> OpenApiRouter<AuthContext> {
         .routes(routes!(video_download))
         .routes(routes!(video_voice_list))
         .routes(routes!(search_query))
+        .routes(routes!(search_x))
 }
 
 pub fn router(ctx: AuthContext) -> axum::Router {
@@ -384,8 +397,48 @@ async fn search_query(
     ))
 }
 
-fn nonempty(domains: Option<Vec<String>>) -> Option<Vec<String>> {
-    domains.filter(|domains| !domains.is_empty())
+#[utoipa::path(
+    post,
+    path = "/search/x",
+    request_body = SearchXBody,
+    responses(
+        (status = 200, description = "x_search result", body = XSearchResult),
+        (status = 400, description = "Invalid request", body = ErrorBody),
+        (status = 401, description = "Not authenticated", body = ErrorBody)
+    ),
+    tag = "search"
+)]
+async fn search_x(
+    State(ctx): State<AuthContext>,
+    Json(body): Json<SearchXBody>,
+) -> Result<Json<XSearchResult>, ApiError> {
+    Ok(Json(
+        search::x_query(
+            &ctx,
+            XSearchRequest {
+                query: body.query,
+                model: body
+                    .model
+                    .unwrap_or_else(|| ctx.config.default_search_model.clone()),
+                from_date: nonempty_string(body.from_date),
+                to_date: nonempty_string(body.to_date),
+                allowed_x_handles: nonempty(body.allowed_x_handles),
+                excluded_x_handles: nonempty(body.excluded_x_handles),
+                enable_image_understanding: body.enable_image_understanding.unwrap_or(false),
+                enable_video_understanding: body.enable_video_understanding.unwrap_or(false),
+            },
+            false,
+        )
+        .await?,
+    ))
+}
+
+fn nonempty(values: Option<Vec<String>>) -> Option<Vec<String>> {
+    values.filter(|values| !values.is_empty())
+}
+
+fn nonempty_string(value: Option<String>) -> Option<String> {
+    value.filter(|value| !value.is_empty())
 }
 
 #[cfg(test)]
@@ -408,6 +461,7 @@ mod tests {
             "/video/download",
             "/video/voices",
             "/search/query",
+            "/search/x",
         ] {
             assert!(json.contains(&format!("\"{path}\"")), "missing {path}");
         }
