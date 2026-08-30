@@ -72,12 +72,12 @@ pub enum Resource {
         #[command(subcommand)]
         command: AuthCommand,
     },
-    /// Image generation (generate)
+    /// Image generation (generate, model list)
     Image {
         #[command(subcommand)]
         command: ImageCommand,
     },
-    /// Video generation (generate, task get, download)
+    /// Video generation (generate, task get, download, voice list)
     Video {
         #[command(subcommand)]
         command: VideoCommand,
@@ -128,7 +128,7 @@ pub enum ImageCommand {
         /// Image description
         #[arg(long)]
         prompt: String,
-        /// Aspect ratio (e.g. 16:9, 1:1)
+        /// Aspect ratio: auto (default), 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3, 2:1, 1:2, 21:9, 19.5:9
         #[arg(long)]
         aspect_ratio: Option<String>,
         /// Number of images to generate (default: 1)
@@ -137,7 +137,7 @@ pub enum ImageCommand {
         /// Save image to exact file path (single image only)
         #[arg(long)]
         out: Option<PathBuf>,
-        /// Response format: url (download), base64 (embed)
+        /// Response format: url|base64 (default url). Wire names: url, b64_json
         #[arg(long, default_value = "url")]
         response_format: String,
         /// Download images to directory
@@ -146,19 +146,30 @@ pub enum ImageCommand {
         /// Filename prefix (default: image)
         #[arg(long, default_value = "image")]
         out_prefix: String,
-        /// Image model ID
+        /// Image model ID (default: grok-imagine-image-2.0). See `grok-api image model list`. Examples: grok-imagine-image-2.0, grok-imagine-image-quality
         #[arg(long)]
         model: Option<String>,
-        /// Output resolution: 1k, 2k
+        /// Output resolution: 1k (default), 2k
         #[arg(long)]
         resolution: Option<String>,
-        /// Quality: low, medium
-        #[arg(long)]
+        /// Quality: low, medium, auto. Imagine accepts auto; high is not supported
+        #[arg(long, value_parser = ["low", "medium", "auto"])]
         quality: Option<String>,
         /// Source image path or URL for image editing
         #[arg(long)]
         image: Option<String>,
     },
+    /// Query Imagine image models
+    Model {
+        #[command(subcommand)]
+        command: ImageModelCommand,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ImageModelCommand {
+    /// List Imagine image models from GET /models
+    List,
 }
 
 #[derive(Subcommand, Debug)]
@@ -183,6 +194,12 @@ pub enum VideoCommand {
         /// Aspect ratio: 16:9, 9:16, 1:1, 4:3, 3:4
         #[arg(long, alias = "ratio")]
         aspect_ratio: Option<String>,
+        /// Resolution: 480p (API default if omitted), 720p, 1080p. Same flag for text-to-video and image-to-video
+        #[arg(long)]
+        resolution: Option<String>,
+        /// Preset TTS voice_id (repeatable). Tag speakers as <AUDIO_0>, <AUDIO_1>, <AUDIO_2>. Examples: eve, ara, leo, rex. See `grok-api video voice list`
+        #[arg(long, alias = "reference-audio")]
+        voice: Vec<String>,
         /// Save video to file on completion
         #[arg(long)]
         download: Option<PathBuf>,
@@ -201,6 +218,11 @@ pub enum VideoCommand {
         #[command(subcommand)]
         command: VideoTaskCommand,
     },
+    /// Query TTS voices for reference-to-video
+    Voice {
+        #[command(subcommand)]
+        command: VideoVoiceCommand,
+    },
     /// Download a completed video by request ID or URL
     Download {
         /// File / request ID to download
@@ -210,6 +232,12 @@ pub enum VideoCommand {
         #[arg(long)]
         out: PathBuf,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum VideoVoiceCommand {
+    /// List TTS voices from GET /tts/voices
+    List,
 }
 
 #[derive(Subcommand, Debug)]
@@ -252,8 +280,8 @@ Usage: grok-api <resource> <command> [flags]
 
 Resources:
   auth       Authentication (login, status, refresh, logout)
-  image      Image generation (generate)
-  video      Video generation (generate, task get, download)
+  image      Image generation (generate, model list)
+  video      Video generation (generate, task get, download, voice list)
   config     CLI configuration (show, set)
 
 Global Flags:
@@ -298,7 +326,13 @@ mod tests {
         .unwrap();
         match cli.resource {
             Some(Resource::Image {
-                command: ImageCommand::Generate { prompt, aspect_ratio, n, .. },
+                command:
+                    ImageCommand::Generate {
+                        prompt,
+                        aspect_ratio,
+                        n,
+                        ..
+                    },
             }) => {
                 assert_eq!(prompt, "a cat");
                 assert_eq!(aspect_ratio.as_deref(), Some("16:9"));
@@ -310,20 +344,14 @@ mod tests {
 
     #[test]
     fn parses_video_task_get() {
-        let cli = Cli::try_parse_from([
-            "grok-api",
-            "video",
-            "task",
-            "get",
-            "--task-id",
-            "abc",
-        ])
-        .unwrap();
+        let cli =
+            Cli::try_parse_from(["grok-api", "video", "task", "get", "--task-id", "abc"]).unwrap();
         match cli.resource {
             Some(Resource::Video {
-                command: VideoCommand::Task {
-                    command: VideoTaskCommand::Get { task_id },
-                },
+                command:
+                    VideoCommand::Task {
+                        command: VideoTaskCommand::Get { task_id },
+                    },
             }) => assert_eq!(task_id, "abc"),
             other => panic!("unexpected {other:?}"),
         }
@@ -332,5 +360,128 @@ mod tests {
     #[test]
     fn clap_debug_assert() {
         Cli::command().debug_assert();
+    }
+
+    fn image_generate_help() -> String {
+        let mut cmd = Cli::command();
+        cmd.find_subcommand_mut("image")
+            .unwrap()
+            .find_subcommand_mut("generate")
+            .unwrap()
+            .render_long_help()
+            .to_string()
+    }
+
+    fn video_generate_help() -> String {
+        let mut cmd = Cli::command();
+        cmd.find_subcommand_mut("video")
+            .unwrap()
+            .find_subcommand_mut("generate")
+            .unwrap()
+            .render_long_help()
+            .to_string()
+    }
+
+    #[test]
+    fn image_generate_help_covers_defaults() {
+        let help = image_generate_help();
+        assert!(help.contains("low"));
+        assert!(help.contains("medium"));
+        assert!(help.contains("auto"));
+        assert!(help.contains("1k"));
+        assert!(help.contains("2k"));
+        assert!(help.contains("url|base64") || help.contains("url") && help.contains("base64"));
+        assert!(help.contains("b64_json"));
+        assert!(help.contains("image model list"));
+        assert!(help.contains("1:1"));
+        assert!(help.contains("16:9"));
+        assert!(help.contains("21:9"));
+    }
+
+    #[test]
+    fn video_generate_help_covers_resolution_and_voice() {
+        let help = video_generate_help();
+        assert!(help.contains("480p"));
+        assert!(help.contains("720p"));
+        assert!(help.contains("1080p"));
+        assert!(help.contains("--voice") || help.contains("voice"));
+        assert!(help.contains("<AUDIO_0>"));
+        assert!(help.contains("video voice list"));
+    }
+
+    #[test]
+    fn rejects_image_quality_high() {
+        let err = Cli::try_parse_from([
+            "grok-api",
+            "image",
+            "generate",
+            "--prompt",
+            "a cat",
+            "--quality",
+            "high",
+        ])
+        .unwrap_err();
+        let text = err.to_string();
+        assert!(text.contains("high"));
+        assert!(text.contains("low") && text.contains("medium") && text.contains("auto"));
+    }
+
+    #[test]
+    fn parses_image_model_list() {
+        let cli = Cli::try_parse_from(["grok-api", "image", "model", "list"]).unwrap();
+        assert!(matches!(
+            cli.resource,
+            Some(Resource::Image {
+                command: ImageCommand::Model {
+                    command: ImageModelCommand::List
+                }
+            })
+        ));
+    }
+
+    #[test]
+    fn parses_video_voice_and_resolution() {
+        let cli = Cli::try_parse_from([
+            "grok-api",
+            "video",
+            "generate",
+            "--prompt",
+            "hello <AUDIO_0>",
+            "--voice",
+            "eve",
+            "--resolution",
+            "720p",
+            "--async",
+        ])
+        .unwrap();
+        match cli.resource {
+            Some(Resource::Video {
+                command:
+                    VideoCommand::Generate {
+                        voice,
+                        resolution,
+                        r#async,
+                        ..
+                    },
+            }) => {
+                assert_eq!(voice, ["eve"]);
+                assert_eq!(resolution.as_deref(), Some("720p"));
+                assert!(r#async);
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_video_voice_list() {
+        let cli = Cli::try_parse_from(["grok-api", "video", "voice", "list"]).unwrap();
+        assert!(matches!(
+            cli.resource,
+            Some(Resource::Video {
+                command: VideoCommand::Voice {
+                    command: VideoVoiceCommand::List
+                }
+            })
+        ));
     }
 }

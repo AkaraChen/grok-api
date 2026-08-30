@@ -55,8 +55,10 @@ pub struct VideoGenerateRequest {
     pub model: String,
     pub image: Option<String>,
     pub reference_images: Vec<String>,
+    pub voices: Vec<String>,
     pub duration: Option<u32>,
     pub aspect_ratio: Option<String>,
+    pub resolution: Option<String>,
     pub wait: bool,
     pub poll_interval_secs: u64,
 }
