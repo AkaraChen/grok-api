@@ -10,14 +10,16 @@ use clap::Parser;
 
 use crate::cli::{
     AuthCommand, Cli, ConfigCommand, Globals, ImageCommand, ImageModelCommand, Resource,
-    VideoCommand, VideoTaskCommand, VideoVoiceCommand, print_root_help, source_from_globals,
+    SearchCommand, VideoCommand, VideoTaskCommand, VideoVoiceCommand, print_root_help,
+    source_from_globals,
 };
 use crate::error::Result;
 use crate::infra::output::{emit, emit_text};
 use crate::model::config::{DEFAULT_POLL_INTERVAL_SECS, OutputFormat};
 use crate::model::media::{ImageGenerateRequest, ResponseFormat, VideoGenerateRequest};
+use crate::model::search::WebSearchRequest;
 use crate::service::auth::AuthContext;
-use crate::service::{auth, config as config_service, image, video};
+use crate::service::{auth, config as config_service, image, search, video};
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -67,6 +69,7 @@ async fn dispatch(globals: Globals, resource: Resource) -> Result<()> {
         Resource::Auth { command } => auth_cmd(&ctx, &globals, output, command).await,
         Resource::Image { command } => image_cmd(&ctx, &globals, output, command).await,
         Resource::Video { command } => video_cmd(&ctx, &globals, output, command).await,
+        Resource::Search { command } => search_cmd(&ctx, &globals, output, command).await,
         Resource::Config { command } => config_cmd(&globals, output, command),
     }
 }
@@ -369,6 +372,52 @@ fn format_voice_line(voice: &serde_json::Value) -> String {
     }
 }
 
+async fn search_cmd(
+    ctx: &AuthContext,
+    globals: &Globals,
+    output: OutputFormat,
+    command: SearchCommand,
+) -> Result<()> {
+    let SearchCommand::Query {
+        query,
+        allowed_domain,
+        excluded_domain,
+        model,
+    } = command;
+    let result = search::query(
+        ctx,
+        WebSearchRequest {
+            query,
+            model: model.unwrap_or_else(|| ctx.config.default_search_model.clone()),
+            allowed_domains: nonempty(allowed_domain),
+            excluded_domains: nonempty(excluded_domain),
+        },
+        globals.dry_run,
+    )
+    .await?;
+    let text = if globals.dry_run {
+        "dry-run: would call POST /responses".to_string()
+    } else {
+        format_search_text(&result)
+    };
+    emit(output, globals.quiet, text, &result)
+}
+
+fn nonempty(domains: Vec<String>) -> Option<Vec<String>> {
+    if domains.is_empty() {
+        None
+    } else {
+        Some(domains)
+    }
+}
+
+fn format_search_text(result: &crate::model::search::WebSearchResult) -> String {
+    if result.citations.is_empty() {
+        return result.content.clone();
+    }
+    format!("{}\n\n{}", result.content, result.citations.join("\n"))
+}
+
 fn config_cmd(globals: &Globals, output: OutputFormat, command: ConfigCommand) -> Result<()> {
     match command {
         ConfigCommand::Show => {
@@ -377,12 +426,13 @@ fn config_cmd(globals: &Globals, output: OutputFormat, command: ConfigCommand) -
                 output,
                 globals.quiet,
                 format!(
-                    "auth_source={} base_url={} timeout={} image={} video={}",
+                    "auth_source={} base_url={} timeout={} image={} video={} search={}",
                     config.auth_source.as_str(),
                     config.base_url,
                     config.timeout,
                     config.default_image_model,
-                    config.default_video_model
+                    config.default_video_model,
+                    config.default_search_model
                 ),
                 &serde_json::json!({
                     "config": config,

@@ -36,7 +36,9 @@ pub fn auth_path_for(source: AuthSource) -> std::path::PathBuf {
 }
 
 pub fn load_credential(ctx: &AuthContext) -> Result<Credential> {
-    let env_key = std::env::var("XAI_API_KEY").ok().filter(|value| !value.is_empty());
+    let env_key = std::env::var("XAI_API_KEY")
+        .ok()
+        .filter(|value| !value.is_empty());
     if let Some(api_key) = ctx
         .api_key_override
         .as_ref()
@@ -93,9 +95,8 @@ pub fn login_from_grok_cli() -> Result<AuthStatus> {
             path.display()
         ))
     })?;
-    let credential = first_credential(&store, AuthSource::GrokCli).ok_or_else(|| {
-        Error::auth("Grok CLI auth.json has no usable credential")
-    })?;
+    let credential = first_credential(&store, AuthSource::GrokCli)
+        .ok_or_else(|| Error::auth("Grok CLI auth.json has no usable credential"))?;
     let mut config = config_service::load()?;
     config.auth_source = AuthSource::GrokCli;
     config_service::save(&config)?;

@@ -5,6 +5,7 @@ use super::auth::AuthSource;
 pub const DEFAULT_BASE_URL: &str = "https://api.x.ai/v1";
 pub const DEFAULT_IMAGE_MODEL: &str = "grok-imagine-image-2.0";
 pub const DEFAULT_VIDEO_MODEL: &str = "grok-imagine-video-1.5";
+pub const DEFAULT_SEARCH_MODEL: &str = "grok-4.6";
 pub const DEFAULT_TIMEOUT_SECS: u64 = 300;
 pub const DEFAULT_POLL_INTERVAL_SECS: u64 = 5;
 
@@ -42,6 +43,8 @@ pub struct AppConfig {
     pub default_image_model: String,
     #[serde(default = "default_video_model")]
     pub default_video_model: String,
+    #[serde(default = "default_search_model")]
+    pub default_search_model: String,
 }
 
 fn default_base_url() -> String {
@@ -60,6 +63,10 @@ fn default_video_model() -> String {
     DEFAULT_VIDEO_MODEL.to_string()
 }
 
+fn default_search_model() -> String {
+    DEFAULT_SEARCH_MODEL.to_string()
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
@@ -70,6 +77,7 @@ impl Default for AppConfig {
             api_key: None,
             default_image_model: default_image_model(),
             default_video_model: default_video_model(),
+            default_search_model: default_search_model(),
         }
     }
 }
@@ -90,6 +98,7 @@ impl AppConfig {
             "api_key" => self.api_key = Some(value.to_string()),
             "default_image_model" => self.default_image_model = value.to_string(),
             "default_video_model" => self.default_video_model = value.to_string(),
+            "default_search_model" => self.default_search_model = value.to_string(),
             _ => return Err("unknown key"),
         }
         Ok(())

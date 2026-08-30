@@ -16,20 +16,17 @@ pub fn load() -> Result<AppConfig> {
 pub fn save(config: &AppConfig) -> Result<()> {
     ensure_api_home()?;
     let path = api_config_path();
-    let raw =
-        toml::to_string_pretty(config).map_err(|err| Error::Config(err.to_string()))?;
+    let raw = toml::to_string_pretty(config).map_err(|err| Error::Config(err.to_string()))?;
     fs::write(&path, raw).map_err(|source| Error::io(&path, source))?;
     Ok(())
 }
 
 pub fn set(key: &str, value: &str) -> Result<AppConfig> {
     let mut config = load()?;
-    config
-        .set(key, value)
-        .map_err(|flag| Error::InvalidValue {
-            flag,
-            value: value.to_string(),
-        })?;
+    config.set(key, value).map_err(|flag| Error::InvalidValue {
+        flag,
+        value: value.to_string(),
+    })?;
     save(&config)?;
     Ok(config)
 }

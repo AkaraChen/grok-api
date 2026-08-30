@@ -40,6 +40,8 @@ grok-api image generate --prompt "A cat" --out /tmp/cat.jpg
 grok-api video generate --prompt "Ocean waves at sunset." --download sunset.mp4
 grok-api video generate --prompt "A robot painting." --async --quiet
 grok-api video task get --task-id <request_id>
+grok-api search query --query "xAI grok imagine API"
+grok-api search query --query "tokio spawn" --allowed-domain docs.rs --allowed-domain tokio.rs
 grok-api config show
 ```
 

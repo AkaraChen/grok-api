@@ -82,6 +82,11 @@ pub enum Resource {
         #[command(subcommand)]
         command: VideoCommand,
     },
+    /// Web search (query)
+    Search {
+        #[command(subcommand)]
+        command: SearchCommand,
+    },
     /// CLI configuration (show, set)
     Config {
         #[command(subcommand)]
@@ -251,6 +256,25 @@ pub enum VideoTaskCommand {
 }
 
 #[derive(Subcommand, Debug)]
+pub enum SearchCommand {
+    /// Search the web via POST /responses with the official web_search tool
+    Query {
+        /// Search query
+        #[arg(long)]
+        query: String,
+        /// Restrict results to this domain (repeatable)
+        #[arg(long)]
+        allowed_domain: Vec<String>,
+        /// Exclude this domain (repeatable)
+        #[arg(long)]
+        excluded_domain: Vec<String>,
+        /// Responses model used by the official web_search tool
+        #[arg(long, env = "GROK_WEB_SEARCH_MODEL")]
+        model: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
 pub enum ConfigCommand {
     /// Display current configuration
     Show,
@@ -282,6 +306,7 @@ Resources:
   auth       Authentication (login, status, refresh, logout)
   image      Image generation (generate, model list)
   video      Video generation (generate, task get, download, voice list)
+  search     Web search (query)
   config     CLI configuration (show, set)
 
 Global Flags:
@@ -483,5 +508,40 @@ mod tests {
                 }
             })
         ));
+    }
+
+    #[test]
+    fn parses_search_query() {
+        let cli = Cli::try_parse_from([
+            "grok-api",
+            "search",
+            "query",
+            "--query",
+            "rust async",
+            "--allowed-domain",
+            "docs.rs",
+            "--allowed-domain",
+            "tokio.rs",
+            "--model",
+            "grok-4.6",
+        ])
+        .unwrap();
+        match cli.resource {
+            Some(Resource::Search {
+                command:
+                    SearchCommand::Query {
+                        query,
+                        allowed_domain,
+                        excluded_domain,
+                        model,
+                    },
+            }) => {
+                assert_eq!(query, "rust async");
+                assert_eq!(allowed_domain, ["docs.rs", "tokio.rs"]);
+                assert!(excluded_domain.is_empty());
+                assert_eq!(model.as_deref(), Some("grok-4.6"));
+            }
+            other => panic!("unexpected {other:?}"),
+        }
     }
 }

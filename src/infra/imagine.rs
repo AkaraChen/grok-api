@@ -62,6 +62,10 @@ impl ImagineClient {
         })
     }
 
+    pub(crate) fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
     fn headers(&self) -> Result<HeaderMap> {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -147,7 +151,7 @@ impl ImagineClient {
         Ok(())
     }
 
-    async fn post_json(&self, url: &str, body: Value) -> Result<Value> {
+    pub(crate) async fn post_json(&self, url: &str, body: Value) -> Result<Value> {
         let request = self.http.post(url).headers(self.headers()?).json(&body);
         let response = self
             .auth

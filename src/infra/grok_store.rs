@@ -4,9 +4,9 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
-use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
 use crate::model::auth::{AuthMode, AuthSource, Credential};
+use serde::{Deserialize, Serialize};
 
 /// Official `auth.json` shape used by Grok Build (`~/.grok/auth.json`).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
