@@ -1,6 +1,6 @@
 ---
 name: grok-api
-description: Run the grok-api CLI to generate or edit Grok Imagine images, start/poll/download Imagine videos, search the web via official web_search, and manage ~/.grok-api credentials. Use when the user asks to generate images or videos with Grok/xAI, animate a still, check a video task, download a clip, search with grok-api, or log in with XAI_API_KEY / official grok auth. Do not use for the official grok TUI/coding agent, and do not invent Imagine or search fields the CLI does not expose.
+description: Run the grok-api CLI to generate or edit Grok Imagine images, start/poll/download Imagine videos, search the web via official web_search, serve MCP over stdio or streamable HTTP, and manage ~/.grok-api credentials. Use when the user asks to generate images or videos with Grok/xAI, animate a still, check a video task, download a clip, search with grok-api, start grok-api mcp, or log in with XAI_API_KEY / official grok auth. Do not use for the official grok TUI/coding agent, and do not invent Imagine or search fields the CLI does not expose.
 metadata:
   title: grok-api
   icon: "🛰️"
@@ -112,6 +112,22 @@ grok-api search query --query "tokio spawn" --allowed-domain docs.rs --allowed-d
 ```
 
 `--allowed-domain` and `--excluded-domain` are mutually exclusive on the API. Do not send both. JSON fields: `query`, `content`, `citations`, `allowed_domains`.
+
+## MCP
+
+Same tools as the CLI resources. Auth is the process credentials (`XAI_API_KEY`, `~/.grok-api`, or `--from-grok-cli`). stdio must not write to stdout except the protocol.
+
+```bash
+# Cursor / Claude Desktop spawn this
+grok-api mcp
+# or
+grok-api mcp stdio
+
+# Streamable HTTP at http://127.0.0.1:3920/mcp
+grok-api mcp http --bind 127.0.0.1:3920
+```
+
+Tools: `image_generate`, `image_model_list`, `video_generate`, `video_task_get`, `video_download`, `video_voice_list`, `search_query`, `auth_status`, `config_show`. Field names match the CLI / official Imagine and web_search payloads.
 
 ## Config
 

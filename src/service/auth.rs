@@ -11,6 +11,7 @@ use crate::model::auth::{AuthSource, AuthStatus, Credential};
 use crate::model::config::AppConfig;
 use crate::service::config as config_service;
 
+#[derive(Clone)]
 pub struct AuthContext {
     pub config: AppConfig,
     pub api_key_override: Option<String>,

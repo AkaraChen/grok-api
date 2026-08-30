@@ -87,6 +87,11 @@ pub enum Resource {
         #[command(subcommand)]
         command: SearchCommand,
     },
+    /// MCP server (stdio or streamable HTTP)
+    Mcp {
+        #[command(subcommand)]
+        command: Option<McpCommand>,
+    },
     /// CLI configuration (show, set)
     Config {
         #[command(subcommand)]
@@ -275,6 +280,18 @@ pub enum SearchCommand {
 }
 
 #[derive(Subcommand, Debug)]
+pub enum McpCommand {
+    /// Serve MCP over stdio (default when `grok-api mcp` has no command)
+    Stdio,
+    /// Serve MCP over streamable HTTP
+    Http {
+        /// Bind address (default: 127.0.0.1:3920)
+        #[arg(long, default_value = "127.0.0.1:3920")]
+        bind: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
 pub enum ConfigCommand {
     /// Display current configuration
     Show,
@@ -307,6 +324,7 @@ Resources:
   image      Image generation (generate, model list)
   video      Video generation (generate, task get, download, voice list)
   search     Web search (query)
+  mcp        MCP server (stdio, http)
   config     CLI configuration (show, set)
 
 Global Flags:
@@ -508,6 +526,27 @@ mod tests {
                 }
             })
         ));
+    }
+
+    #[test]
+    fn parses_mcp_stdio_default() {
+        let cli = Cli::try_parse_from(["grok-api", "mcp"]).unwrap();
+        assert!(matches!(
+            cli.resource,
+            Some(Resource::Mcp { command: None })
+        ));
+    }
+
+    #[test]
+    fn parses_mcp_http_bind() {
+        let cli =
+            Cli::try_parse_from(["grok-api", "mcp", "http", "--bind", "127.0.0.1:4000"]).unwrap();
+        match cli.resource {
+            Some(Resource::Mcp {
+                command: Some(McpCommand::Http { bind }),
+            }) => assert_eq!(bind, "127.0.0.1:4000"),
+            other => panic!("unexpected {other:?}"),
+        }
     }
 
     #[test]

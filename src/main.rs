@@ -1,6 +1,7 @@
 mod cli;
 mod error;
 mod infra;
+mod mcp;
 mod model;
 mod service;
 
@@ -9,8 +10,8 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use crate::cli::{
-    AuthCommand, Cli, ConfigCommand, Globals, ImageCommand, ImageModelCommand, Resource,
-    SearchCommand, VideoCommand, VideoTaskCommand, VideoVoiceCommand, print_root_help,
+    AuthCommand, Cli, ConfigCommand, Globals, ImageCommand, ImageModelCommand, McpCommand,
+    Resource, SearchCommand, VideoCommand, VideoTaskCommand, VideoVoiceCommand, print_root_help,
     source_from_globals,
 };
 use crate::error::Result;
@@ -70,6 +71,7 @@ async fn dispatch(globals: Globals, resource: Resource) -> Result<()> {
         Resource::Image { command } => image_cmd(&ctx, &globals, output, command).await,
         Resource::Video { command } => video_cmd(&ctx, &globals, output, command).await,
         Resource::Search { command } => search_cmd(&ctx, &globals, output, command).await,
+        Resource::Mcp { command } => mcp_cmd(ctx, command).await,
         Resource::Config { command } => config_cmd(&globals, output, command),
     }
 }
@@ -416,6 +418,13 @@ fn format_search_text(result: &crate::model::search::WebSearchResult) -> String 
         return result.content.clone();
     }
     format!("{}\n\n{}", result.content, result.citations.join("\n"))
+}
+
+async fn mcp_cmd(ctx: AuthContext, command: Option<McpCommand>) -> Result<()> {
+    match command.unwrap_or(McpCommand::Stdio) {
+        McpCommand::Stdio => crate::mcp::serve_stdio(ctx).await,
+        McpCommand::Http { bind } => crate::mcp::serve_http(ctx, &bind).await,
+    }
 }
 
 fn config_cmd(globals: &Globals, output: OutputFormat, command: ConfigCommand) -> Result<()> {
