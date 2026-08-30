@@ -1,4 +1,5 @@
 /target
+/actionlint
 .cargo-home
 **/*.rs.bk
 .DS_Store

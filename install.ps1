@@ -53,7 +53,7 @@ Manual downloads (once a release exists):
 function Get-InstallerToken {
     if ($env:GITHUB_TOKEN) { return $env:GITHUB_TOKEN }
     if ($env:GH_TOKEN) { return $env:GH_TOKEN }
-    if (Get-Command gh -ErrorAction SilentlyContinue) {
+    if (-not $env:GROK_API_SKIP_GH -and (Get-Command gh -ErrorAction SilentlyContinue)) {
         $token = & gh auth token 2>$null
         if ($LASTEXITCODE -eq 0 -and $token) { return ([string]$token).Trim() }
     }

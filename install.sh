@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # Download the latest grok-api release for this machine (Linux / macOS / Git Bash).
+# Prefer: curl -fsSL .../install.sh | bash
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "error: run this installer with bash:" >&2
+  echo "  curl -fsSL https://raw.githubusercontent.com/AkaraChen/grok-api/main/install.sh | bash" >&2
+  exit 1
+fi
 set -euo pipefail
 
 REPO="${GROK_API_REPO:-AkaraChen/grok-api}"
@@ -57,7 +63,7 @@ resolve_token() {
     printf '%s' "${GH_TOKEN}"
     return 0
   fi
-  if command -v gh >/dev/null 2>&1; then
+  if [[ -z "${GROK_API_SKIP_GH:-}" ]] && command -v gh >/dev/null 2>&1; then
     local token
     if token="$(gh auth token 2>/dev/null)" && [[ -n "${token}" ]]; then
       printf '%s' "${token}"

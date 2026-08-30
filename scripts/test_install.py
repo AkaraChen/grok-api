@@ -200,7 +200,13 @@ def run(
 
 def base_env(install_dir: Path, origin: str, extra: dict[str, str] | None = None) -> dict[str, str]:
     env = os.environ.copy()
-    for key in ("GITHUB_TOKEN", "GH_TOKEN", "GROK_API_VERSION", "GROK_API_TARGET"):
+    for key in (
+        "GITHUB_TOKEN",
+        "GH_TOKEN",
+        "GROK_API_VERSION",
+        "GROK_API_TARGET",
+        "GROK_API_SKIP_GH",
+    ):
         env.pop(key, None)
     env.update(
         {
@@ -233,17 +239,12 @@ def write_fake_gh(bin_dir: Path, token: str | None, fail: bool = False) -> None:
 
 
 def without_real_gh(env: dict[str, str], fake_bin: Path | None = None) -> dict[str, str]:
-    path_parts = [part for part in env.get("PATH", "").split(os.pathsep) if part]
-    filtered = []
-    for part in path_parts:
-        gh = Path(part) / "gh"
-        if gh.exists():
-            continue
-        filtered.append(part)
-    if fake_bin is not None:
-        filtered.insert(0, str(fake_bin))
     env = env.copy()
-    env["PATH"] = os.pathsep.join(filtered)
+    if fake_bin is not None:
+        env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
+        env.pop("GROK_API_SKIP_GH", None)
+    else:
+        env["GROK_API_SKIP_GH"] = "1"
     return env
 
 
@@ -389,7 +390,11 @@ def main() -> int:
                     pwsh,
                     "-NoProfile",
                     "-Command",
-                    f"$null = [System.Management.Automation.Language.Parser]::ParseFile('{INSTALL_PS1}', [ref]$null, [ref]$errs); if ($errs) {{ $errs | ForEach-Object {{ $_.ToString() }}; exit 1 }}",
+                    (
+                        "$errs = $null; "
+                        f"$null = [System.Management.Automation.Language.Parser]::ParseFile('{INSTALL_PS1}', [ref]$null, [ref]$errs); "
+                        "if ($errs) { $errs | ForEach-Object { $_.ToString() }; exit 1 }"
+                    ),
                 ],
                 os.environ.copy(),
             )
