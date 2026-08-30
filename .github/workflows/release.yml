@@ -1,0 +1,167 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            cross: linux
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: taiki-e/setup-cross-toolchain-action@v1
+        if: matrix.cross == 'linux'
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Static CRT on Windows
+        if: endsWith(matrix.target, 'windows-msvc')
+        shell: bash
+        run: echo "RUSTFLAGS=${RUSTFLAGS:-} -C target-feature=+crt-static" >> "$GITHUB_ENV"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Smoke-test native binary
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          host="$(rustc -vV | sed -n 's/^host: //p')"
+          ext=""
+          if [[ "${TARGET}" == *windows* ]]; then
+            ext=".exe"
+          fi
+          bin="target/${TARGET}/release/grok-api${ext}"
+          if [[ "${TARGET}" == "${host}" ]]; then
+            "${bin}" --help
+          else
+            echo "skip smoke test; host=${host} target=${TARGET}"
+          fi
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/package-release.sh "${{ matrix.target }}"
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: grok-api-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  checksums:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: grok-api-*
+          merge-multiple: true
+
+      - name: Checksums and Scoop manifest
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find artifacts -type f -exec cp {} dist/ \;
+          ls -la dist
+          (cd dist && sha256sum grok-api-* | tee SHA256SUMS)
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
+          fi
+          x64_hash="$(awk '/grok-api-x86_64-pc-windows-msvc.zip$/ {print $1}' dist/SHA256SUMS)"
+          arm_hash="$(awk '/grok-api-aarch64-pc-windows-msvc.zip$/ {print $1}' dist/SHA256SUMS)"
+          python3 scripts/gen_scoop.py \
+            --version "${version}" \
+            --x64-hash "${x64_hash}" \
+            --arm64-hash "${arm_hash}" \
+            --out dist/grok-api.json
+          test -s dist/SHA256SUMS
+          test -s dist/grok-api.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: grok-api-checksums
+          path: |
+            dist/SHA256SUMS
+            dist/grok-api.json
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, checksums]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find artifacts -type f -exec cp {} dist/ \;
+          ls -la dist
+          test -f dist/SHA256SUMS
+          test -f dist/grok-api-x86_64-unknown-linux-gnu.tar.gz
+          test -f dist/grok-api-aarch64-unknown-linux-gnu.tar.gz
+          test -f dist/grok-api-x86_64-apple-darwin.tar.gz
+          test -f dist/grok-api-aarch64-apple-darwin.tar.gz
+          test -f dist/grok-api-x86_64-pc-windows-msvc.zip
+          test -f dist/grok-api-aarch64-pc-windows-msvc.zip
+          test -f dist/grok-api.json
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

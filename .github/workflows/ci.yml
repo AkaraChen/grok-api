@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --locked
+
+  install-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install PowerShell
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/pwsh.tgz \
+            https://github.com/PowerShell/PowerShell/releases/download/v7.6.5/powershell-7.6.5-linux-x64.tar.gz
+          sudo mkdir -p /opt/pwsh
+          sudo tar -xzf /tmp/pwsh.tgz -C /opt/pwsh
+          sudo ln -sf /opt/pwsh/pwsh /usr/local/bin/pwsh
+          pwsh --version
+      - name: Lint GitHub Actions workflows
+        run: |
+          set -euo pipefail
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint
+      - name: Installer end-to-end tests
+        run: python3 scripts/test_install.py
