@@ -14,6 +14,7 @@ import tarfile
 import tempfile
 import threading
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -256,6 +257,37 @@ def installed_ok(install_dir: Path) -> bool:
     return result.returncode == 0 and MARKER in result.stdout
 
 
+def has_github_token(env: dict[str, str]) -> bool:
+    return bool(env.get("GITHUB_TOKEN") or env.get("GH_TOKEN"))
+
+
+def run_real_github_api(
+    failures: Failures,
+    install_dir: Path,
+    command: list[str],
+    extra: dict[str, str],
+    name: str,
+    success: Callable[[subprocess.CompletedProcess[str], Path], bool],
+) -> None:
+    install_dir.mkdir()
+    env = os.environ.copy()
+    env.update(
+        {
+            "GROK_API_REPO": REPO,
+            "GROK_API_INSTALL_DIR": str(install_dir),
+            **extra,
+        }
+    )
+    result = run(command, env)
+    text = result.stdout + result.stderr
+    installed = bool(success(result, install_dir))
+    rate_limited = "rate limit" in text.lower() and "releases/latest" in text
+    # Authenticated CI must install. Local runs without a token may still hit
+    # the unauthenticated GitHub limit.
+    ok = installed if has_github_token(env) else installed or rate_limited
+    failures.check(name, ok, text)
+
+
 def main() -> int:
     failures = Failures()
     sh_syntax = run(["bash", "-n", str(INSTALL_SH)], os.environ.copy())
@@ -495,27 +527,26 @@ def main() -> int:
         else:
             failures.check("gen_scoop.py", False, gen.stderr)
 
-        # Real GitHub API: latest release should install, unless unauthenticated
-        # requests hit a rate limit.
-        real_dir = tmp / "real"
-        real_dir.mkdir()
-        real_env = os.environ.copy()
-        real_env.update(
-            {
-                "GROK_API_REPO": REPO,
-                "GROK_API_INSTALL_DIR": str(real_dir),
-                "GROK_API_TARGET": LINUX_TARGET,
-            }
-        )
-        real = run(["bash", str(INSTALL_SH)], real_env)
-        text = real.stdout + real.stderr
-        installed = real.returncode == 0 and "Installed grok-api" in text
-        rate_limited = "rate limit" in text.lower() and "releases/latest" in text
-        failures.check(
+        # Live GitHub API. Mock cases strip tokens; this path keeps GITHUB_TOKEN /
+        # GH_TOKEN from CI so we do not hit unauthenticated rate limits.
+        run_real_github_api(
+            failures,
+            tmp / "real",
+            ["bash", str(INSTALL_SH)],
+            {"GROK_API_TARGET": LINUX_TARGET},
             "install.sh real GitHub API",
-            installed or rate_limited,
-            text,
+            lambda result, _dest: result.returncode == 0
+            and "Installed grok-api" in (result.stdout + result.stderr),
         )
+        if pwsh:
+            run_real_github_api(
+                failures,
+                tmp / "real-ps1",
+                [pwsh, "-NoProfile", "-File", str(INSTALL_PS1)],
+                {"GROK_API_TARGET": WIN_TARGET},
+                "install.ps1 real GitHub API",
+                lambda result, dest: result.returncode == 0 and (dest / "grok-api.exe").is_file(),
+            )
 
     if failures:
         print(f"\n{len(failures)} test(s) failed: {', '.join(failures)}")
