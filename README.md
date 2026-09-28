@@ -2,36 +2,37 @@
 
 # grok-api
 
-**CLI, MCP server, and local HTTP API for Grok Imagine, web search, and X search.**
+**Bring Grok Imagine to your terminal.**
+
+Generate images and videos, search the web and X, and connect your agents through MCP or HTTP.
 
 [![CI](https://github.com/AkaraChen/grok-api/actions/workflows/ci.yml/badge.svg)](https://github.com/AkaraChen/grok-api/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/AkaraChen/grok-api)](https://github.com/AkaraChen/grok-api/releases/latest)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org)
+[![Release](https://img.shields.io/github/v/release/AkaraChen/grok-api?color=168a91)](https://github.com/AkaraChen/grok-api/releases/latest)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-168a91)](https://www.apache.org/licenses/LICENSE-2.0)
 
-One binary. Same command shape everywhere:
+[Install](#install) · [Quick start](#quick-start) · [Examples](#usage) · [MCP](#mcp) · [HTTP](#http)
 
-```text
-grok-api <resource> <command> [flags]
-```
+<img src="docs/assets/imagine-rover.jpg" alt="Generated with grok-api: a white research rover crosses a black volcanic plain beneath a turquoise glacial arch." width="960">
 
-[Install](#install) · [Quick start](#quick-start) · [Usage](#usage) · [MCP](#mcp) · [HTTP](#http)
+*One prompt. One image. Made with grok-api.* [See the exact command →](docs/showcase.md)
 
 </div>
 
----
+## From a prompt to a file
 
-Generate and edit images, start and download videos, search the web or X — then expose the same resources over MCP or a local OpenAPI server. Credentials live in `~/.grok-api` so this CLI never writes `~/.grok` and never collides with official `grok`.
+```bash
+grok-api image generate \
+  --prompt "A white research rover on a volcanic plain beside turquoise ice" \
+  --aspect-ratio 2:1 --out ./rover.jpg
+```
 
-## Features
+One binary, three ways to work: **CLI · MCP · HTTP**. The command shape stays simple:
+`grok-api <resource> <command> [flags]`.
 
-| Surface | What you get |
-| --- | --- |
-| **Images** | Text-to-image and multi-image edits via Grok Imagine |
-| **Video** | Text-to-video and image-to-video, with poll, download, and TTS voices |
-| **Search** | Official `web_search` and `x_search` |
-| **MCP** | stdio for Cursor / Claude Desktop, or streamable HTTP |
-| **HTTP** | Same resources on localhost, with Swagger UI at `/docs` |
+| Create | Discover | Connect |
+| --- | --- | --- |
+| Generate and edit images, including multi-image edits | Search the web with domain filters | Run an MCP server over stdio or HTTP |
+| Generate videos from text or an image; poll and download | Search X with handle and date filters | Serve a local HTTP API with Swagger UI |
 
 ## Install
 
@@ -41,7 +42,8 @@ Generate and edit images, start and download videos, search the web or X — the
 curl -fsSL https://raw.githubusercontent.com/AkaraChen/grok-api/main/install.sh | bash
 ```
 
-Installs to `~/.local/bin`. Override with `GROK_API_INSTALL_DIR`.
+Requires `curl`, `tar`, and either `python3` or `jq`. Installs to `~/.local/bin`;
+add it to `PATH` if needed. Override the destination with `GROK_API_INSTALL_DIR`.
 
 ### Windows
 
@@ -57,7 +59,9 @@ Installs to `%LOCALAPPDATA%\grok-api` and adds that directory to your user `PATH
 # Scoop
 scoop install https://github.com/AkaraChen/grok-api/releases/latest/download/grok-api.json
 
-# From this repo
+# From source (requires Git and the stable Rust toolchain)
+git clone https://github.com/AkaraChen/grok-api.git
+cd grok-api
 cargo install --path .
 ```
 
@@ -74,20 +78,64 @@ Winget cannot install a GitHub release URL directly — it needs a package in [m
 
 ## Quick start
 
+### 1. Authenticate
+
+Choose **one** method. With an existing official Grok CLI login:
+
 ```bash
-# Reuse an existing official Grok CLI login
 grok-api auth login --from-grok-cli
-
-# Or sign in into ~/.grok-api
-grok-api auth login --oauth
-grok-api auth login --device-auth
-grok-api auth login --api-key xai-...
-
-# Generate an image
-grok-api image generate --prompt "A cat in a spacesuit on Mars" --aspect-ratio 16:9
 ```
 
-`--api-key` and `XAI_API_KEY` override stored credentials. `auth logout --yes` deletes only `~/.grok-api/auth.json`. It never touches `~/.grok`.
+Or save your own API key (replace the placeholder):
+
+```bash
+grok-api auth login --api-key "YOUR_XAI_API_KEY"
+```
+
+### 2. Generate and save
+
+```bash
+grok-api image generate \
+  --prompt "A white research rover on a volcanic plain beside turquoise ice" \
+  --aspect-ratio 2:1 --out ./rover.jpg
+```
+
+`--out` saves one image to the path you choose. Use `--out-dir` for a batch.
+Without either flag, the default URL response is printed rather than saved.
+The cover uses a longer prompt: [reproduce the showcase](docs/showcase.md).
+
+### 3. Make it your own
+
+```bash
+# Generate three variations
+grok-api image generate --prompt "A tiny lunar greenhouse" --n 3 --out-dir ./generated/
+
+# Inspect generation without submitting it
+grok-api image generate --prompt "A tiny lunar greenhouse" --dry-run
+
+# Discover available image models
+grok-api image model list
+```
+
+## Authentication
+
+OAuth and device login require the official `grok` executable on your `PATH`
+(see [Grok Build](https://github.com/xai-org/grok-build)). Choose the flow you need:
+
+```bash
+grok-api auth login --oauth
+grok-api auth login --device-auth
+grok-api auth status
+```
+
+These login flows write to `~/.grok-api`. `--from-grok-cli` reads the existing
+login in `~/.grok`; this CLI does not write to that directory.
+An existing official login is also used as a fallback if the selected local store is empty.
+
+For scripts, set `XAI_API_KEY` or pass `--api-key "YOUR_XAI_API_KEY"` for one invocation.
+CLI flags / `XAI_API_KEY` take precedence over saved credentials in the CLI.
+`grok-api auth logout --yes` deletes only `~/.grok-api/auth.json`; it leaves the
+official login, environment variables, and config intact.
 
 ## Usage
 
@@ -109,20 +157,35 @@ Add `--help` after any command for flags and defaults.
 ```bash
 grok-api image generate --prompt "A cat in a spacesuit on Mars" --aspect-ratio 16:9
 grok-api image generate --prompt "Logo design" --n 3 --out-dir ./generated/
-grok-api image generate --prompt "A cat" --out /tmp/cat.jpg
+grok-api image generate --prompt "A cat" --out ./cat.jpg
 grok-api image generate --prompt "combine these" --image subject.png --image style.png
 grok-api image model list
 ```
 
 ### Video
 
+Generate a clip and save it locally, or return a task ID for your own polling loop.
+
 ```bash
 grok-api video generate --prompt "Ocean waves at sunset." --download sunset.mp4
 grok-api video generate --prompt "A robot painting." --async --quiet
-grok-api video task get --task-id <request_id>
-grok-api video download --file-id <request_id> --out out.mp4
+grok-api video task get --task-id "YOUR_REQUEST_ID"
+grok-api video download --file-id "YOUR_REQUEST_ID" --out out.mp4
 grok-api video voice list
 ```
+
+Animate an image (use your own file, or the image from Quick start):
+
+```bash
+grok-api video generate \
+  --image ./rover.jpg \
+  --prompt "The rover moves slowly forward. A gentle camera push toward the ice." \
+  --duration 5 --resolution 720p --download ./rover.mp4
+```
+
+The video commands are usage examples; no generated video is included in this README.
+Replace `YOUR_REQUEST_ID` with the ID returned by `--async`. Download after the task
+is complete; do not combine `--async` with `--download`.
 
 ### Search
 
@@ -187,7 +250,18 @@ grok-api config set --key default_search_model --value grok-4.6
 | `--output json` | Machine-readable output |
 | `--quiet` | Payload only |
 | `--non-interactive` | No prompts (CI / agents) |
-| `--dry-run` | Print the request without calling the API |
+| `--dry-run` | Preview supported operations, including image/video generation |
+
+`--dry-run` does not cover every subcommand: `video task get` and
+`video download` still contact the API. Use `--help` to inspect those commands.
+
+## More documentation
+
+- [Authentication](#authentication) — login options and credential storage
+- [MCP](#mcp) / [HTTP](#http) — use the same resources in agents and applications
+- [CLI help](#usage) — add `--help` to any command for all options
+- [Showcase notes](docs/showcase.md) — exact image prompt, provenance, and design references
+- [Contributor guide](AGENTS.md) — architecture, local checks, and releases
 
 ## License
 
